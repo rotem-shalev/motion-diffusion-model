@@ -57,7 +57,7 @@ def get_model_path_from_args():
 
 def add_base_options(parser):
     group = parser.add_argument_group('base')
-    group.add_argument("--cuda", default=True, type=bool, help="Use cuda device, otherwise use CPU.")
+    group.add_argument("--cuda", action='store_true', help="Use cuda device, otherwise use CPU.")
     group.add_argument("--device", default=0, type=int, help="Device id to use.")
     group.add_argument("--seed", default=10, type=int, help="For fixing random seed.")
     group.add_argument("--batch_size", default=64, type=int, help="Batch size during training.")
@@ -98,7 +98,8 @@ def add_model_options(parser):
 
 def add_data_options(parser):
     group = parser.add_argument_group('dataset')
-    group.add_argument("--dataset", default='humanml', choices=['humanml', 'kit', 'humanact12', 'uestc'], type=str,
+    group.add_argument("--dataset", default='humanml', choices=['humanml', 'kit', 'humanact12', 'uestc', 'interhand'],
+                       type=str,
                        help="Dataset name (choose from list).")
     group.add_argument("--data_dir", default="", type=str,
                        help="If empty, will use defaults according to the specified dataset.")

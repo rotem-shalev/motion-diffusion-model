@@ -5,6 +5,7 @@ import torch
 import contextlib
 
 from smplx import SMPLLayer as _SMPLLayer
+from smplx import MANOLayer as _MANOLayer  # TODO- why not MANO?
 from smplx.lbs import vertices2joints
 
 
@@ -12,7 +13,7 @@ from smplx.lbs import vertices2joints
 # change 0 and 8
 action2motion_joints = [8, 1, 2, 3, 4, 5, 6, 7, 0, 9, 10, 11, 12, 13, 14, 21, 24, 38]
 
-from utils.config import SMPL_MODEL_PATH, JOINT_REGRESSOR_TRAIN_EXTRA
+from utils.config import SMPL_MODEL_PATH, JOINT_REGRESSOR_TRAIN_EXTRA, SMPL_MANO_MODEL_PATH
 
 JOINTSTYPE_ROOT = {"a2m": 0, # action2motion
                    "smpl": 0,
@@ -61,37 +62,45 @@ JOINT_NAMES = [
 
 
 # adapted from VIBE/SPIN to output smpl_joints, vibe joints and action2motion joints
-class SMPL(_SMPLLayer):
+class SMPL(_MANOLayer):
     """ Extension of the official SMPL implementation to support more joints """
 
     def __init__(self, model_path=SMPL_MODEL_PATH, **kwargs):
+        self.mano = "MANO" in model_path
+        self.model_path = model_path
         kwargs["model_path"] = model_path
 
         # remove the verbosity for the 10-shapes beta parameters
         with contextlib.redirect_stdout(None):
             super(SMPL, self).__init__(**kwargs)
-            
-        J_regressor_extra = np.load(JOINT_REGRESSOR_TRAIN_EXTRA)
-        self.register_buffer('J_regressor_extra', torch.tensor(J_regressor_extra, dtype=torch.float32))
-        vibe_indexes = np.array([JOINT_MAP[i] for i in JOINT_NAMES])
-        a2m_indexes = vibe_indexes[action2motion_joints]
-        smpl_indexes = np.arange(24)
-        a2mpl_indexes = np.unique(np.r_[smpl_indexes, a2m_indexes])
-
-        self.maps = {"vibe": vibe_indexes,
-                     "a2m": a2m_indexes,
-                     "smpl": smpl_indexes,
-                     "a2mpl": a2mpl_indexes}
+        #
+        # J_regressor_extra = np.load(JOINT_REGRESSOR_TRAIN_EXTRA)
+        # self.register_buffer('J_regressor_extra', torch.tensor(J_regressor_extra, dtype=torch.float32))
+        # vibe_indexes = np.array([JOINT_MAP[i] for i in JOINT_NAMES])
+        # a2m_indexes = vibe_indexes[action2motion_joints]
+        # smpl_indexes = np.arange(24)
+        # a2mpl_indexes = np.unique(np.r_[smpl_indexes, a2m_indexes])
+        #
+        # self.maps = {"vibe": vibe_indexes,
+        #              "a2m": a2m_indexes,
+        #              "smpl": smpl_indexes,
+        #              "a2mpl": a2mpl_indexes}
         
     def forward(self, *args, **kwargs):
-        smpl_output = super(SMPL, self).forward(*args, **kwargs)
-        
-        extra_joints = vertices2joints(self.J_regressor_extra, smpl_output.vertices)
-        all_joints = torch.cat([smpl_output.joints, extra_joints], dim=1)
-
-        output = {"vertices": smpl_output.vertices}
-
-        for joinstype, indexes in self.maps.items():
-            output[joinstype] = all_joints[:, indexes]
-            
-        return output
+        if self.mano:
+            print("in mano")
+            for arg, val in kwargs.items():
+                print(arg, val.size())
+            print(torch.cat([kwargs["global_orient"], kwargs["hand_pose"]], dim=1).size())
+            return _MANOLayer(model_path=self.model_path).forward(*args, **kwargs)
+        # smpl_output = super(SMPL, self).forward(*args, **kwargs)
+        #
+        # extra_joints = vertices2joints(self.J_regressor_extra, smpl_output.vertices)
+        # all_joints = torch.cat([smpl_output.joints, extra_joints], dim=1)
+        #
+        # output = {"vertices": smpl_output.vertices}
+        #
+        # for joinstype, indexes in self.maps.items():
+        #     output[joinstype] = all_joints[:, indexes]
+        #
+        # return output

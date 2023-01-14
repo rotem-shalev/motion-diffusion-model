@@ -1305,6 +1305,7 @@ class GaussianDiffusion:
             target_xyz, model_output_xyz = None, None
 
             if self.lambda_rcxyz > 0.:
+                print("target size:", target.size())
                 target_xyz = get_xyz(target)  # [bs, nvertices(vertices)/njoints(smpl), 3, nframes]
                 model_output_xyz = get_xyz(model_output)  # [bs, nvertices, 3, nframes]
                 terms["rcxyz_mse"] = self.masked_l2(target_xyz, model_output_xyz, mask)  # mean_flat((target_xyz - model_output_xyz) ** 2)

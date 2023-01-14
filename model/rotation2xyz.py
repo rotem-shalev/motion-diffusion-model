@@ -1,8 +1,7 @@
 # This code is based on https://github.com/Mathux/ACTOR.git
 import torch
 import utils.rotation_conversions as geometry
-
-
+from utils.config import SMPL_MANO_MODEL_PATH
 from model.smpl import SMPL, JOINTSTYPE_ROOT
 # from .get_model import JOINTSTYPES
 JOINTSTYPES = ["a2m", "a2mpl", "smpl", "vibe", "vertices"]
@@ -12,7 +11,10 @@ class Rotation2xyz:
     def __init__(self, device, dataset='amass'):
         self.device = device
         self.dataset = dataset
-        self.smpl_model = SMPL().eval().to(device)
+        if self.dataset == 'interhand':
+            self.smpl_model = SMPL(SMPL_MANO_MODEL_PATH).eval().to(device)
+        else:
+            self.smpl_model = SMPL().eval().to(device)
 
     def __call__(self, x, mask, pose_rep, translation, glob,
                  jointstype, vertstrans, betas=None, beta=0,
@@ -37,6 +39,7 @@ class Rotation2xyz:
 
         x_rotations = x_rotations.permute(0, 3, 1, 2)
         nsamples, time, njoints, feats = x_rotations.shape
+        print("nsamples, time, njoints, feats:", x_rotations.shape)
 
         # Compute rotations (convert only masked sequences output)
         if pose_rep == "rotvec":
@@ -55,7 +58,9 @@ class Rotation2xyz:
             global_orient = geometry.axis_angle_to_matrix(global_orient).view(1, 1, 3, 3)
             global_orient = global_orient.repeat(len(rotations), 1, 1, 1)
         else:
-            global_orient = rotations[:, 0]
+            print("glob")
+            print(rotations.size())
+            global_orient = rotations[:, 0].unsqueeze(1)
             rotations = rotations[:, 1:]
 
         if betas is None:
@@ -63,7 +68,11 @@ class Rotation2xyz:
                                 dtype=rotations.dtype, device=rotations.device)
             betas[:, 1] = beta
             # import ipdb; ipdb.set_trace()
-        out = self.smpl_model(body_pose=rotations, global_orient=global_orient, betas=betas)
+        # out = self.smpl_model(body_pose=rotations, global_orient=global_orient, betas=betas)
+        print("before smpl model call")
+        print(rotations.size())
+        print(global_orient.size())
+        out = self.smpl_model(hand_pose=rotations, global_orient=global_orient, betas=betas)
 
         # get the desirable joints
         joints = out[jointstype]

@@ -33,6 +33,7 @@ def get_model_args(args, data):
 
     # SMPL defaults
     data_rep = 'rot6d'
+    pose_rep = 'rot6d'
     njoints = 25
     nfeats = 6
 
@@ -44,9 +45,13 @@ def get_model_args(args, data):
         data_rep = 'hml_vec'
         njoints = 251
         nfeats = 1
+    elif args.dataset == 'interhand':
+        njoints = 16
+        nfeats = 3
+        pose_rep = "rotvec"
 
     return {'modeltype': '', 'njoints': njoints, 'nfeats': nfeats, 'num_actions': num_actions,
-            'translation': True, 'pose_rep': 'rot6d', 'glob': True, 'glob_rot': True,
+            'translation': True, 'pose_rep': pose_rep, 'glob': True, 'glob_rot': True,
             'latent_dim': args.latent_dim, 'ff_size': 1024, 'num_layers': args.layers, 'num_heads': 4,
             'dropout': 0.1, 'activation': "gelu", 'data_rep': data_rep, 'cond_mode': cond_mode,
             'cond_mask_prob': args.cond_mask_prob, 'action_emb': action_emb, 'arch': args.arch,

@@ -92,7 +92,6 @@ class MDM(nn.Module):
 
         self.output_process = OutputProcess(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
                                             self.nfeats)
-
         self.rot2xyz = Rotation2xyz(device='cpu', dataset=self.dataset)
 
     def parameters_wo_clip(self):

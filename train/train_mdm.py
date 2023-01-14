@@ -4,6 +4,8 @@ Train a diffusion model on images.
 """
 
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 import json
 from utils.fixseed import fixseed
 from utils.parser_util import train_args

@@ -24,6 +24,7 @@ from data_loaders.get_data import get_dataset_loader
 # We found that the lg_loss_scale quickly climbed to
 # 20-21 within the first ~1K steps of training.
 INITIAL_LOG_LOSS_SCALE = 20.0
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 
 class TrainLoop:
@@ -125,19 +126,17 @@ class TrainLoop:
             self.opt.load_state_dict(state_dict)
 
     def run_loop(self):
-
         for epoch in range(self.num_epochs):
             print(f'Starting epoch {epoch}')
             for motion, cond in tqdm(self.data):
                 if not (not self.lr_anneal_steps or self.step + self.resume_step < self.lr_anneal_steps):
                     break
-
                 motion = motion.to(self.device)
                 cond['y'] = {key: val.to(self.device) if torch.is_tensor(val) else val for key, val in cond['y'].items()}
 
                 self.run_step(motion, cond)
                 if self.step % self.log_interval == 0:
-                    for k,v in logger.get_current().name2val.items():
+                    for k, v in logger.get_current().name2val.items():
                         if k == 'loss':
                             print('step[{}]: loss[{:0.5f}]'.format(self.step+self.resume_step, v))
 
@@ -202,7 +201,6 @@ class TrainLoop:
         end_eval = time.time()
         print(f'Evaluation time: {round(end_eval-start_eval)/60}min')
 
-
     def run_step(self, batch, cond):
         self.forward_backward(batch, cond)
         self.mp_trainer.optimize(self.opt)
@@ -258,10 +256,8 @@ class TrainLoop:
         logger.logkv("step", self.step + self.resume_step)
         logger.logkv("samples", (self.step + self.resume_step + 1) * self.global_batch)
 
-
     def ckpt_file_name(self):
         return f"model{(self.step+self.resume_step):09d}.pt"
-
 
     def save(self):
         def save_checkpoint(params):
