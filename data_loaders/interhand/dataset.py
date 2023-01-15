@@ -17,9 +17,9 @@ sys.path.insert(0, rootdir)  # TODO- fix paths from outside
 class InterHand(Dataset):
     dataname = "interhand"
 
-    def __init__(self, datapath="../dataset/interHand", split="train", fps=30, only_right=True, translation=False,
+    def __init__(self, datapath="../dataset/interHand", split="train", fps=30, only_right=True, translation=True,
                  align_pose_frontview=False, num_frames=1, min_len=-1, max_len=-1, max_seq_num=10, sampling="conseq",
-                 sampling_step=1):
+                 sampling_step=1, glob=True):
 
         super().__init__()
 
@@ -83,8 +83,9 @@ class InterHand(Dataset):
         self.min_len = min_len
         self.max_len = max_len
         self.num_frames = num_frames
-        self.translation = translation
+        self.glob = glob
         self.align_pose_frontview = align_pose_frontview
+        self.translation = translation
         self.sampling = sampling
         self.sampling_step = sampling_step
 
@@ -105,37 +106,18 @@ class InterHand(Dataset):
 
     def get_pose_data(self, data_index, frame_ix):
         pose = self._load(data_index, frame_ix)
-        # TODO- add shape and trans?
         return pose
 
     def _load(self, ind, frame_ix):
-        if self.translation: # TODO- understand what it is
-            if getattr(self, "_load_translation") is None:
-                raise ValueError("Can't extract translations.")
-            ret_tr = self._load_translation(ind, frame_ix)
-            ret_tr = to_torch(ret_tr - ret_tr[0])
-
         if not hasattr(self, "_load_rotvec"):
             raise ValueError("load rotation vector is not implemented.")
         else:
             pose = self._load_rotvec(ind, frame_ix)
-            # if not self.glob: #understand what glob is, default is True
-            #     pose = pose[:, 1:, :]
+            if not self.glob:
+                pose = pose[:, 1:, :]
             pose = to_torch(pose)
-            if self.align_pose_frontview:  # TODO- understand what is this
-                first_frame_root_pose_matrix = geometry.axis_angle_to_matrix(pose[0][0])
-                all_root_poses_matrix = geometry.axis_angle_to_matrix(pose[:, 0, :])
-                aligned_root_poses_matrix = torch.matmul(torch.transpose(first_frame_root_pose_matrix, 0, 1),
-                                                         all_root_poses_matrix)
-                pose[:, 0, :] = geometry.matrix_to_axis_angle(aligned_root_poses_matrix)
-
-                if self.translation:
-                    ret_tr = torch.matmul(torch.transpose(first_frame_root_pose_matrix, 0, 1).float(),
-                                          torch.transpose(ret_tr, 0, 1))
-                    ret_tr = torch.transpose(ret_tr, 0, 1)
-
             ret = pose
-
+        ret_tr = to_torch(self._trans[ind][frame_ix])
         if self.translation:
             padded_tr = torch.zeros((ret.shape[0], ret.shape[2]), dtype=ret.dtype)
             padded_tr[:, :3] = ret_tr

@@ -46,7 +46,7 @@ def get_model_args(args, data):
         njoints = 251
         nfeats = 1
     elif args.dataset == 'interhand':
-        njoints = 16
+        njoints = 17
         nfeats = 3
         pose_rep = "rotvec"
 

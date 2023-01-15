@@ -132,6 +132,8 @@ def main():
             sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)
 
         rot2xyz_pose_rep = 'xyz' if model.data_rep in ['xyz', 'hml_vec'] else model.data_rep
+        rot2xyz_pose_rep = 'rotvec' if model.dataset == 'interhand' else rot2xyz_pose_rep
+
         rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size, n_frames).bool()
         sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
@@ -170,6 +172,7 @@ def main():
 
     print(f"saving visualizations to [{out_path}]...")
     skeleton = paramUtil.kit_kinematic_chain if args.dataset == 'kit' else paramUtil.t2m_kinematic_chain
+    skeleton = paramUtil.hands_kinematic_chain if args.dataset == 'interhand' else skeleton
 
     sample_files = []
     num_samples_in_out_file = 7

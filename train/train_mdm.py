@@ -4,8 +4,6 @@ Train a diffusion model on images.
 """
 
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
-
 import json
 from utils.fixseed import fixseed
 from utils.parser_util import train_args
@@ -46,6 +44,7 @@ def main():
     print("Training...")
     TrainLoop(args, train_platform, model, diffusion, data).run_loop()
     train_platform.close()
+
 
 if __name__ == "__main__":
     main()

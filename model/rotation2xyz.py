@@ -39,7 +39,6 @@ class Rotation2xyz:
 
         x_rotations = x_rotations.permute(0, 3, 1, 2)
         nsamples, time, njoints, feats = x_rotations.shape
-        print("nsamples, time, njoints, feats:", x_rotations.shape)
 
         # Compute rotations (convert only masked sequences output)
         if pose_rep == "rotvec":
@@ -58,8 +57,6 @@ class Rotation2xyz:
             global_orient = geometry.axis_angle_to_matrix(global_orient).view(1, 1, 3, 3)
             global_orient = global_orient.repeat(len(rotations), 1, 1, 1)
         else:
-            print("glob")
-            print(rotations.size())
             global_orient = rotations[:, 0].unsqueeze(1)
             rotations = rotations[:, 1:]
 
@@ -69,11 +66,7 @@ class Rotation2xyz:
             betas[:, 1] = beta
             # import ipdb; ipdb.set_trace()
         # out = self.smpl_model(body_pose=rotations, global_orient=global_orient, betas=betas)
-        print("before smpl model call")
-        print(rotations.size())
-        print(global_orient.size())
         out = self.smpl_model(hand_pose=rotations, global_orient=global_orient, betas=betas)
-
         # get the desirable joints
         joints = out[jointstype]
 

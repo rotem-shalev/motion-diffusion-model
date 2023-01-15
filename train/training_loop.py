@@ -24,7 +24,6 @@ from data_loaders.get_data import get_dataset_loader
 # We found that the lg_loss_scale quickly climbed to
 # 20-21 within the first ~1K steps of training.
 INITIAL_LOG_LOSS_SCALE = 20.0
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 
 class TrainLoop:
@@ -239,6 +238,8 @@ class TrainLoop:
                 )
 
             loss = (losses["loss"] * weights).mean()
+            print("loss:", loss)
+
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}
             )

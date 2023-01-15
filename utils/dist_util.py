@@ -15,14 +15,11 @@ SETUP_RETRY_COUNT = 3
 
 used_device = 0
 
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
 
 def setup_dist(device=0):
     """
     Setup a distributed process group.
     """
-    return th.device("cpu")  # TODO- change
     global used_device
     used_device = device
     if dist.is_initialized():
@@ -49,7 +46,6 @@ def dev():
     """
     Get the device to use for torch.distributed.
     """
-    return th.device("cpu")  # TODO- change
     global used_device
     if th.cuda.is_available() and used_device>=0:
         return th.device(f"cuda:{used_device}")

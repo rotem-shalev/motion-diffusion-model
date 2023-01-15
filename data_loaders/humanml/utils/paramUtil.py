@@ -3,6 +3,8 @@ import numpy as np
 # Define a kinematic tree for the skeletal struture
 kit_kinematic_chain = [[0, 11, 12, 13, 14, 15], [0, 16, 17, 18, 19, 20], [0, 1, 2, 3, 4], [3, 5, 6, 7], [3, 8, 9, 10]]
 
+hands_kinematic_chain = [[15, 14, 13, 12], [15, 11, 10, 9], [15, 8, 7, 6], [15, 5, 4, 3], [15, 2, 1, 0]]
+
 kit_raw_offsets = np.array(
     [
         [0, 0, 0],

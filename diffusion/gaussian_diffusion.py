@@ -1243,6 +1243,7 @@ class GaussianDiffusion:
         mask = model_kwargs['y']['mask']
         get_xyz = lambda sample: enc.rot2xyz(sample, mask=None, pose_rep=enc.pose_rep, translation=enc.translation,
                                              glob=enc.glob,
+                                             glob_rot=enc.glob_rot,
                                              # jointstype='vertices',  # 3.4 iter/sec # USED ALSO IN MotionCLIP
                                              jointstype='smpl',  # 3.4 iter/sec
                                              vertstrans=False)
@@ -1305,7 +1306,6 @@ class GaussianDiffusion:
             target_xyz, model_output_xyz = None, None
 
             if self.lambda_rcxyz > 0.:
-                print("target size:", target.size())
                 target_xyz = get_xyz(target)  # [bs, nvertices(vertices)/njoints(smpl), 3, nframes]
                 model_output_xyz = get_xyz(model_output)  # [bs, nvertices, 3, nframes]
                 terms["rcxyz_mse"] = self.masked_l2(target_xyz, model_output_xyz, mask)  # mean_flat((target_xyz - model_output_xyz) ** 2)

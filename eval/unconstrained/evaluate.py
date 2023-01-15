@@ -1,5 +1,5 @@
 from eval.unconstrained.models.stgcn import STGCN
-import pandas as pd
+# import pandas as pd
 import os.path as osp
 import os
 import datetime
