@@ -2,8 +2,12 @@
 """
 Train a diffusion model on images.
 """
-
+import sys
 import os
+
+rootdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+sys.path.insert(0, rootdir)
+
 import json
 from utils.fixseed import fixseed
 from utils.parser_util import train_args

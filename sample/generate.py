@@ -17,6 +17,8 @@ import data_loaders.humanml.utils.paramUtil as paramUtil
 from data_loaders.humanml.utils.plot_script import plot_3d_motion
 import shutil
 from data_loaders.tensors import collate
+from model.rotation2xyz import Rotation2xyz
+
 
 
 def main():
@@ -255,5 +257,90 @@ def load_dataset(args, max_frames, n_frames):
     return data
 
 
+def visualize_gt():
+    args = generate_args()
+    args.batch_size = 8
+    fixseed(args.seed)
+    max_frames = 60
+    fps = 15
+    n_frames = min(max_frames, int(args.motion_length * fps))
+    data = load_dataset(args, max_frames, n_frames)
+    iterator = iter(data)
+    _, model_kwargs = next(iterator)
+
+    rot2xyz_pose_rep = 'rotvec'
+    all_motions = []
+
+    for sample in data:
+        rot2xyz_mask = model_kwargs['y']['mask'].reshape(args.batch_size, n_frames).bool()
+        tmp_rot2xyz = Rotation2xyz(device='cpu', dataset="interhand")
+        sample = tmp_rot2xyz(x=sample[0], mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True,
+                             translation=True,
+                             jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+                             get_rotations_back=False)
+
+        all_motions.append(sample.cpu().numpy())
+
+    all_motions = np.concatenate(all_motions, axis=0)
+    skeleton = paramUtil.hands_kinematic_chain
+
+    sample_files = []
+    num_samples_in_out_file = 8
+
+    sample_print_template, row_print_template, all_print_template, \
+    sample_file_template, row_file_template, all_file_template = construct_template_variables(args.unconstrained)
+
+    for i, motion in enumerate(all_motions):
+        rep_files = []
+        motion = motion.transpose(2, 0, 1)
+        animation_save_path = os.path.join(r"/home/rotem_shalev/motion-diffusion-model/save/gt", "test.mp4")
+        plot_3d_motion(animation_save_path, skeleton, motion, dataset="interhand", title="", fps=fps)
+        # Credit for visualization: https://github.com/EricGuo5513/text-to-motion
+        rep_files.append(animation_save_path)
+
+        sample_files = save_multiple_samples(args, animation_save_path, row_print_template, all_print_template,
+                                             row_file_template, all_file_template, "", num_samples_in_out_file,
+                                             rep_files, sample_files, i)
+
+
+def vis_joints():
+    import json
+    import cv2
+    import matplotlib.pyplot as plt
+
+    with open("/home/rotem_shalev/motion-diffusion-model/dataset/interHand/30fps_annotations/test/InterHand2"
+              ".6M_test_joint_3d.json", 'r') as f:
+        data = json.load(f)
+
+    all_3d_joints = []
+    for vid in data.values():
+        cur_vid = []
+        for datum in vid.values():
+            coords = np.array(datum['world_coord'])
+            coords /= 4
+            coords += 100
+            cur_vid.append(coords)
+        all_3d_joints.append(cur_vid)
+
+    fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+    fps = 15
+    for i, vid in enumerate(all_3d_joints):
+        out = cv2.VideoWriter(f"/home/rotem_shalev/motion-diffusion-model/save/gt/coords_{i}.mp4",
+                              fourcc, fps, (400, 400))
+
+        for frame in vid:
+            cur_frame = np.full((400, 400, 3), 255, dtype=np.uint8)
+            for joint_coords in frame:
+                # TODO- add lines
+                cur_frame = cv2.circle(cur_frame, (int(joint_coords[0]), int(joint_coords[2])),
+                                   radius=1, color=(0, 0, 255), thickness=2)
+            out.write(cur_frame)
+        out.release()
+            # cv2.imshow('image', image)
+            # cv2.waitKey(0)
+
+
 if __name__ == "__main__":
     main()
+    # visualize_gt()
+    # vis_joints()

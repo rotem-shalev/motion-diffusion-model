@@ -50,7 +50,7 @@ def get_dataset_loader(name, batch_size, num_frames, split='train', hml_mode='tr
 
     loader = DataLoader(
         dataset, batch_size=batch_size, shuffle=True,
-        num_workers=1, drop_last=True, collate_fn=collate
+        num_workers=0, drop_last=True, collate_fn=collate
     )
 
     return loader

@@ -78,7 +78,7 @@ class Rotation2xyz:
 
         # the first translation root at the origin on the prediction
         if jointstype != "vertices":
-            rootindex = JOINTSTYPE_ROOT[jointstype]
+            rootindex = 15 #JOINTSTYPE_ROOT[jointstype] # wrist is last index
             x_xyz = x_xyz - x_xyz[:, [rootindex], :, :]
 
         if translation and vertstrans:

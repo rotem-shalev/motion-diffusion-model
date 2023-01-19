@@ -11,13 +11,12 @@ from utils.misc import to_torch
 import utils.rotation_conversions as geometry
 
 rootdir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-sys.path.insert(0, rootdir)  # TODO- fix paths from outside
-
+sys.path.insert(0, rootdir)
 
 class InterHand(Dataset):
     dataname = "interhand"
 
-    def __init__(self, datapath="../dataset/interHand", split="train", fps=30, only_right=True, translation=True,
+    def __init__(self, datapath="dataset/interHand", split="train", fps=30, only_right=True, translation=True,
                  align_pose_frontview=False, num_frames=1, min_len=-1, max_len=-1, max_seq_num=10, sampling="conseq",
                  sampling_step=1, glob=True):
 
@@ -27,8 +26,8 @@ class InterHand(Dataset):
             raise ValueError(f"{split} is not a valid split")
 
         self.split = split
-        self.datapath = datapath
-        datafilepath = os.path.join(datapath, f"{fps}fps_annotations/"
+        self.datapath = os.path.join(rootdir, datapath)
+        datafilepath = os.path.join(self.datapath, f"{fps}fps_annotations/"
                                               f"{self.split}/InterHand2.6M_{self.split}_MANO_NeuralAnnot.json")
         with open(datafilepath, 'r') as f:
             data = json.load(f)

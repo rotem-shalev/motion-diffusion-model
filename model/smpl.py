@@ -5,7 +5,7 @@ import torch
 import contextlib
 
 from smplx import SMPLLayer as _SMPLLayer
-from smplx import MANOLayer as _MANOLayer  # TODO- why not MANO?
+from smplx import MANOLayer as _MANOLayer
 from smplx.lbs import vertices2joints
 
 
@@ -15,9 +15,9 @@ from smplx.lbs import vertices2joints
 
 from utils.config import SMPL_MODEL_PATH, JOINT_REGRESSOR_TRAIN_EXTRA, SMPL_MANO_MODEL_PATH
 
-JOINTSTYPE_ROOT = {"a2m": 0, # action2motion
+JOINTSTYPE_ROOT = {"a2m": 0,  # action2motion
                    "smpl": 0,
-                   "a2mpl": 0, # set(smpl, a2m)
+                   "a2mpl": 0,  # set(smpl, a2m)
                    "vibe": 8}  # 0 is the 8 position: OP MidHip below
 
 HANDS_MAP = {
@@ -41,19 +41,22 @@ HANDS_NAMES = [
 ]
 
 
-R_HAND_MAP = {  # TODO- I changed the indices to fit 15, check if it's ok
-    # 'r_thumb4': 0, 'r_index4': 4, 'r_middle4': 8, 'r_ring4': 12, 'r_pinky4': 16,
-    'r_thumb3': 0, 'r_thumb2': 1, 'r_thumb1': 2, 'r_index3': 3, 'r_index2': 4,
-    'r_index1': 5, 'r_middle3': 6, 'r_middle2': 7, 'r_middle1': 8,
-    'r_ring3': 9, 'r_ring2': 10, 'r_ring1': 11, 'r_pinky3': 12, 'r_pinky2': 13,
-    'r_pinky1': 14, 'r_wrist': 15
+R_HAND_MAP = {
+    'r_wrist': 0,
+    'r_thumb1': 1, 'r_thumb2': 2, 'r_thumb3': 3,
+    'r_index1': 4, 'r_index2': 5, 'r_index3': 6,
+    'r_middle1': 7, 'r_middle2': 8, 'r_middle3': 9,
+    'r_ring1': 10, 'r_ring2': 11, 'r_ring3': 12,
+    'r_pinky1': 13, 'r_pinky2': 14, 'r_pinky3': 15
 }
 
 R_HAND_NAMES = [
-    'r_thumb3', 'r_thumb2', 'r_thumb1', 'r_index3', 'r_index2',
-    'r_index1', 'r_middle3', 'r_middle2', 'r_middle1',
-    'r_ring3', 'r_ring2', 'r_ring1', 'r_pinky3', 'r_pinky2',
-    'r_pinky1', 'r_wrist'
+    'r_wrist',
+    'r_thumb1', 'r_thumb2', 'r_thumb3',
+    'r_index1', 'r_index2', 'r_index3',
+    'r_middle1', 'r_middle2', 'r_middle3',
+    'r_ring1', 'r_ring2', 'r_ring3',
+    'r_pinky1', 'r_pinky2', 'r_pinky3'
 ]
 
 
@@ -127,15 +130,7 @@ class SMPL(_MANOLayer):
         }
         
     def forward(self, *args, **kwargs):
-        # if self.mano:
-        #     for arg, val in kwargs.items():
-        #         print(arg, val.size())
-        #     print(torch.cat([kwargs["global_orient"], kwargs["hand_pose"]], dim=1).size())
-        #     output1 = _MANOLayer(model_path=self.model_path).forward(*args, **kwargs)
-        #     print("output1", output1)
         smpl_output = super(SMPL, self).forward(*args, **kwargs)
-        # print("vertices size", smpl_output.vertices.size())
-        # print("J regressor extra", self.J_regressor.size())
         # extra_joints = vertices2joints(self.J_regressor, smpl_output.vertices)
         # all_joints = torch.cat([smpl_output.joints, extra_joints], dim=1)
 
