@@ -47,7 +47,7 @@ def main():
                               num_frames=max_frames,
                               split='test',
                               hml_mode='train')  # in train mode, you get both text and motion.
-    # data.fixed_length = n_frames
+    data.fixed_length = max_frames
     total_num_samples = args.num_samples * args.num_repetitions
 
     print("Creating model and diffusion...")
@@ -57,17 +57,18 @@ def main():
     state_dict = torch.load(args.model_path, map_location='cpu')
     load_model_wo_clip(model, state_dict)
 
-    model = ClassifierFreeSampleModel(model)   # wrapping model with the classifier-free sampler
+    if args.guidance_param != 1:
+        model = ClassifierFreeSampleModel(model)   # wrapping model with the classifier-free sampler
     model.to(dist_util.dev())
     model.eval()  # disable random masking
 
     iterator = iter(data)
     input_motions, model_kwargs = next(iterator)
     input_motions = input_motions.to(dist_util.dev())
-    texts = [args.text_condition] * args.num_samples
-    model_kwargs['y']['text'] = texts
-    if args.text_condition == '':
-        args.guidance_param = 0.  # Force unconditioned generation
+    # texts = [args.text_condition] * args.num_samples
+    # model_kwargs['y']['text'] = texts
+    # if args.text_condition == '':
+    args.guidance_param = 0.  # Force unconditioned generation
 
     # add inpainting mask according to args
     assert max_frames == input_motions.shape[-1]
@@ -79,8 +80,7 @@ def main():
         for i, length in enumerate(model_kwargs['y']['lengths'].cpu().numpy()):
             start_idx, end_idx = int(args.prefix_end * length), int(args.suffix_start * length)
             gt_frames_per_sample[i] = list(range(0, start_idx)) + list(range(end_idx, max_frames))
-            model_kwargs['y']['inpainting_mask'][i, :, :,
-            start_idx: end_idx] = False  # do inpainting in those frames
+            model_kwargs['y']['inpainting_mask'][i, :, :, start_idx: end_idx] = False  # do inpainting in those frames
     elif args.edit_mode == 'upper_body':
         model_kwargs['y']['inpainting_mask'] = torch.tensor(humanml_utils.HML_LOWER_BODY_MASK, dtype=torch.bool,
                                                             device=input_motions.device)  # True is lower body data
@@ -89,13 +89,14 @@ def main():
 
     all_motions = []
     all_lengths = []
-    all_text = []
+    # all_text = []
 
     for rep_i in range(args.num_repetitions):
         print(f'### Start sampling [repetitions #{rep_i}]')
 
         # add CFG scale to batch
-        model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * args.guidance_param
+        if args.guidance_param != 1:
+            model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * args.guidance_param
 
         sample_fn = diffusion.p_sample_loop
 
@@ -112,7 +113,6 @@ def main():
             const_noise=False,
         )
 
-
         # Recover XYZ *positions* from HumanML3D vector representation
         if model.data_rep == 'hml_vec':
             n_joints = 22 if sample.shape[1] == 263 else 21
@@ -120,7 +120,17 @@ def main():
             sample = recover_from_ric(sample, n_joints)
             sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)
 
-        all_text += model_kwargs['y']['text']
+        rot2xyz_pose_rep = 'xyz' if model.data_rep in ['xyz', 'hml_vec'] else model.data_rep
+        rot2xyz_pose_rep = 'rotvec' if model.dataset == 'interhand' else rot2xyz_pose_rep
+
+        rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size,
+                                                                                                length).bool()
+        sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True,
+                                      translation=True,
+                                      jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+                                      get_rotations_back=False)
+
+        # all_text += model_kwargs['y']['text']
         all_motions.append(sample.cpu().numpy())
         all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
 
@@ -129,7 +139,7 @@ def main():
 
     all_motions = np.concatenate(all_motions, axis=0)
     all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]
-    all_text = all_text[:total_num_samples]
+    # all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
 
     if os.path.exists(out_path):
@@ -139,15 +149,17 @@ def main():
     npy_path = os.path.join(out_path, 'results.npy')
     print(f"saving results file to [{npy_path}]")
     np.save(npy_path,
-            {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
+            {'motion': all_motions, #'text': all_text,
+             'lengths': all_lengths,
              'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
-    with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
-        fw.write('\n'.join(all_text))
+    # with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
+    #     fw.write('\n'.join(all_text))
     with open(npy_path.replace('.npy', '_len.txt'), 'w') as fw:
         fw.write('\n'.join([str(l) for l in all_lengths]))
 
     print(f"saving visualizations to [{out_path}]...")
     skeleton = paramUtil.kit_kinematic_chain if args.dataset == 'kit' else paramUtil.t2m_kinematic_chain
+    skeleton = paramUtil.hands_kinematic_chain if args.dataset == 'interhand' else skeleton
 
     # Recover XYZ *positions* from HumanML3D vector representation
     if model.data_rep == 'hml_vec':
@@ -155,11 +167,19 @@ def main():
         input_motions = recover_from_ric(input_motions, n_joints)
         input_motions = input_motions.view(-1, *input_motions.shape[2:]).permute(0, 2, 3, 1).cpu().numpy()
 
+    rot2xyz_pose_rep = 'xyz' if model.data_rep in ['xyz', 'hml_vec'] else model.data_rep
+    rot2xyz_pose_rep = 'rotvec' if model.dataset == 'interhand' else rot2xyz_pose_rep
+
+    rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size,
+                                                                                            length).bool()
+    input_motions = model.rot2xyz(x=input_motions, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
+                           jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+                           get_rotations_back=False)
 
     for sample_i in range(args.num_samples):
         caption = 'Input Motion'
         length = model_kwargs['y']['lengths'][sample_i]
-        motion = input_motions[sample_i].transpose(2, 0, 1)[:length]
+        motion = input_motions[sample_i].cpu().numpy().transpose(2, 0, 1)[:length]
         save_file = 'input_motion{:02d}.mp4'.format(sample_i)
         animation_save_path = os.path.join(out_path, save_file)
         rep_files = [animation_save_path]
@@ -168,7 +188,7 @@ def main():
                        dataset=args.dataset, fps=fps, vis_mode='gt',
                        gt_frames=gt_frames_per_sample.get(sample_i, []))
         for rep_i in range(args.num_repetitions):
-            caption = all_text[rep_i*args.batch_size + sample_i]
+            caption = '' #all_text[rep_i*args.batch_size + sample_i]
             if caption == '':
                 caption = 'Edit [{}] unconditioned'.format(args.edit_mode)
             else:

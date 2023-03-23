@@ -293,7 +293,7 @@ def visualize_gt():
     for i, motion in enumerate(all_motions):
         rep_files = []
         motion = motion.transpose(2, 0, 1)
-        animation_save_path = os.path.join(r"/home/rotem_shalev/motion-diffusion-model/save/gt", "test.mp4")
+        animation_save_path = os.path.join(r"/mnt/raid1/home/rotem_shalev/motion-diffusion-model/save/gt", "test.mp4")
         plot_3d_motion(animation_save_path, skeleton, motion, dataset="interhand", title="", fps=fps)
         # Credit for visualization: https://github.com/EricGuo5513/text-to-motion
         rep_files.append(animation_save_path)
@@ -308,7 +308,7 @@ def vis_joints():
     import cv2
     import matplotlib.pyplot as plt
 
-    with open("/home/rotem_shalev/motion-diffusion-model/dataset/interHand/30fps_annotations/test/InterHand2"
+    with open("/mnt/raid1/home/rotem_shalev/motion-diffusion-model/dataset/interHand/30fps_annotations/test/InterHand2"
               ".6M_test_joint_3d.json", 'r') as f:
         data = json.load(f)
 
@@ -325,7 +325,7 @@ def vis_joints():
     fourcc = cv2.VideoWriter_fourcc(*'MP4V')
     fps = 15
     for i, vid in enumerate(all_3d_joints):
-        out = cv2.VideoWriter(f"/home/rotem_shalev/motion-diffusion-model/save/gt/coords_{i}.mp4",
+        out = cv2.VideoWriter(f"/mnt/raid1/home/rotem_shalev/motion-diffusion-model/save/gt/coords_{i}.mp4",
                               fourcc, fps, (400, 400))
 
         for frame in vid:
