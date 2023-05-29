@@ -5,9 +5,12 @@ numpy array. This can be used to produce samples for FID evaluation.
 """
 from utils.fixseed import fixseed
 import os
+import sys
 import numpy as np
 import torch
-from utils.parser_util import generate_args
+from pose_format.utils.reader import BufferReader
+from pose_format.pose_header import PoseHeader
+from utils.parser_util import generate_args, vis_gt_args
 from utils.model_util import create_model_and_diffusion, load_model_wo_clip
 from utils import dist_util
 from model.cfg_sampler import ClassifierFreeSampleModel
@@ -18,27 +21,36 @@ from data_loaders.humanml.utils.plot_script import plot_3d_motion
 import shutil
 from data_loaders.tensors import collate
 from model.rotation2xyz import Rotation2xyz
-
+from visualize.vis_2d import visualize_seq
 
 
 def main():
     args = generate_args()
+    # args.text_prompt = "\ue000\ue00c\ue0e6\ue000\ue00e\ue029\ue03d\ue084\ue0c6"
+                       #"\ue002\ue00c\ue020\ue03e\ue051\ue093\ue0c6\ue0d8" # pjm_2377 with palml
+
     fixseed(args.seed)
     out_path = args.output_dir
     name = os.path.basename(os.path.dirname(args.model_path))
     niter = os.path.basename(args.model_path).replace('model', '').replace('.pt', '')
-    max_frames = 196 if args.dataset in ['kit', 'humanml'] else 60
-    fps = 12.5 if args.dataset == 'kit' else 20
+    max_frames_dict = {'kit': 196, 'humanml': 196, 'grab': 120, 'hanco': 40, 'hoi4d': 120, 'ham2pose': 200}
+    max_frames = max_frames_dict.get(args.dataset, 60)
+    fps_dict = {'kit': 12.5, 'hanco': 10, 'grab': 30, 'hoi4d': 15, 'ham2pose': 25}
+    fps = fps_dict.get(args.dataset, 20)
     n_frames = min(max_frames, int(args.motion_length*fps))
+    n_frames = max_frames if args.dataset in ['hanco', 'grab', 'hoi4d', 'ham2pose'] else n_frames
     is_using_data = not any([args.input_text, args.text_prompt, args.action_file, args.action_name])
+
     dist_util.setup_dist(args.device)
     if out_path == '':
         out_path = os.path.join(os.path.dirname(args.model_path),
                                 'samples_{}_{}_seed{}'.format(name, niter, args.seed))
         if args.text_prompt != '':
-            out_path += '_' + args.text_prompt.replace(' ', '_').replace('.', '')
+            out_path += '_' + "hamnosys_test"#args.text_prompt.replace(' ', '_').replace('.', '')
         elif args.input_text != '':
             out_path += '_' + os.path.basename(args.input_text).replace('.txt', '').replace(' ', '_').replace('.', '')
+
+    out_path = os.path.join(out_path, args.split)
 
     # this block must be called BEFORE the dataset is loaded
     if args.text_prompt != '':
@@ -69,7 +81,7 @@ def main():
     args.batch_size = args.num_samples  # Sampling a single batch from the testset, with exactly args.num_samples
 
     print('Loading dataset...')
-    data = load_dataset(args, max_frames, n_frames)
+    data = load_dataset(args, max_frames, n_frames, split=args.split)
     total_num_samples = args.num_samples * args.num_repetitions
 
     print("Creating model and diffusion...")
@@ -86,7 +98,9 @@ def main():
 
     if is_using_data:
         iterator = iter(data)
-        _, model_kwargs = next(iterator)
+        gt_motion, model_kwargs = next(iterator)
+        if args.dataset == "all_hands":
+            model_kwargs['y']['lengths'] = torch.ones_like(model_kwargs['y']['lengths'])*max_frames
     else:
         collate_args = [{'inp': torch.zeros(n_frames), 'tokens': None, 'lengths': n_frames}] * args.num_samples
         is_t2m = any([args.input_text, args.text_prompt])
@@ -111,6 +125,10 @@ def main():
         if args.guidance_param != 1:
             model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * args.guidance_param
 
+        if 'mask' in model_kwargs['y']:
+            padding_mask = torch.zeros((args.batch_size, 1, 1, max_frames-model_kwargs['y']['mask'].shape[-1]), dtype=torch.bool)
+            model_kwargs['y']['mask'] = torch.cat([model_kwargs['y']['mask'], padding_mask], dim=-1).to(dist_util.dev())
+
         sample_fn = diffusion.p_sample_loop
 
         sample = sample_fn(
@@ -133,10 +151,11 @@ def main():
             sample = recover_from_ric(sample, n_joints)
             sample = sample.view(-1, *sample.shape[2:]).permute(0, 2, 3, 1)
 
-        rot2xyz_pose_rep = 'xyz' if model.data_rep in ['xyz', 'hml_vec'] else model.data_rep
-        rot2xyz_pose_rep = 'rotvec' if model.dataset == 'interhand' else rot2xyz_pose_rep
+        rot2xyz_pose_rep = 'xyz' if model.data_rep in ['xyz', 'hml_vec', 'ham2pose'] else model.data_rep
 
-        rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size, n_frames).bool()
+        rot2xyz_mask = None if rot2xyz_pose_rep == 'xyz' else model_kwargs['y']['mask'].reshape(args.batch_size, -1).bool()
+        if args.dataset == "all_hands":
+            rot2xyz_mask = torch.ones((args.batch_size, n_frames), dtype=torch.bool)
         sample = model.rot2xyz(x=sample, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                                jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                                get_rotations_back=False)
@@ -145,13 +164,13 @@ def main():
             all_text += ['unconstrained'] * args.num_samples
         else:
             text_key = 'text' if 'text' in model_kwargs['y'] else 'action_text'
+            text_key = 'id' if (args.dataset == "ham2pose" and is_using_data) else text_key
             all_text += model_kwargs['y'][text_key]
 
         all_motions.append(sample.cpu().numpy())
         all_lengths.append(model_kwargs['y']['lengths'].cpu().numpy())
 
         print(f"created {len(all_motions) * args.batch_size} samples")
-
 
     all_motions = np.concatenate(all_motions, axis=0)
     all_motions = all_motions[:total_num_samples]  # [bs, njoints, 6, seqlen]
@@ -174,13 +193,19 @@ def main():
 
     print(f"saving visualizations to [{out_path}]...")
     skeleton = paramUtil.kit_kinematic_chain if args.dataset == 'kit' else paramUtil.t2m_kinematic_chain
-    skeleton = paramUtil.hands_kinematic_chain if args.dataset == 'interhand' else skeleton
+    skeleton = paramUtil.hands_kinematic_chain if args.dataset in ['interhand', 'hanco', 'grab', 'hoi4d',
+                                                                   'all_hands'] else skeleton
 
     sample_files = []
     num_samples_in_out_file = 7
 
     sample_print_template, row_print_template, all_print_template, \
     sample_file_template, row_file_template, all_file_template = construct_template_variables(args.unconstrained)
+
+    if args.dataset == "ham2pose":
+        pose_header_path = "/home/rotem_shalev/Ham2Pose/data/hamnosys/openpose.poseheader"
+        with open(pose_header_path, "rb") as buffer:
+            pose_header = PoseHeader.read(BufferReader(buffer.read()))
 
     for sample_i in range(args.num_samples):
         rep_files = []
@@ -191,13 +216,22 @@ def main():
             save_file = sample_file_template.format(sample_i, rep_i)
             print(sample_print_template.format(caption, sample_i, rep_i, save_file))
             animation_save_path = os.path.join(out_path, save_file)
-            plot_3d_motion(animation_save_path, skeleton, motion, dataset=args.dataset, title=caption, fps=fps)
+            if args.dataset == "ham2pose" and is_using_data:
+                cur_gt_motion = gt_motion['motion'][sample_i].numpy().transpose(2, 0, 1)[:length]
+                cur_gt_conf = gt_motion['confidence'][sample_i].numpy().transpose(1, 0)[:length]
+                visualize_seq(motion, pose_header, out_path, caption+f"_rep_{rep_i}", fps=fps,
+                              label_pose=cur_gt_motion, label_conf=cur_gt_conf)
+            elif args.dataset == "ham2pose":
+                visualize_seq(motion, pose_header, out_path, f"rep_{rep_i}", fps=fps)
+            else:
+                plot_3d_motion(animation_save_path, skeleton, motion, dataset=args.dataset, title=caption, fps=fps)
             # Credit for visualization: https://github.com/EricGuo5513/text-to-motion
             rep_files.append(animation_save_path)
 
-        sample_files = save_multiple_samples(args, out_path,
-                                               row_print_template, all_print_template, row_file_template, all_file_template,
-                                               caption, num_samples_in_out_file, rep_files, sample_files, sample_i)
+        if args.dataset != "ham2pose":
+            sample_files = save_multiple_samples(args, out_path, row_print_template, all_print_template,
+                                             row_file_template, all_file_template, caption, num_samples_in_out_file,
+                                             rep_files, sample_files, sample_i)
 
     abs_path = os.path.abspath(out_path)
     print(f'[Done] Results are at [{abs_path}]')
@@ -247,100 +281,153 @@ def construct_template_variables(unconstrained):
            sample_file_template, row_file_template, all_file_template
 
 
-def load_dataset(args, max_frames, n_frames):
+def load_dataset(args, max_frames, n_frames, subset=None, split='test'):
     data = get_dataset_loader(name=args.dataset,
                               batch_size=args.batch_size,
                               num_frames=max_frames,
-                              split='test',
-                              hml_mode='text_only')
+                              split=split,
+                              hml_mode='text_only',
+                              subset=subset,
+                              max_seq_num=args.max_seq_num)
     data.fixed_length = n_frames
     return data
 
 
 def visualize_gt():
-    args = generate_args()
-    args.batch_size = 8
+    args = vis_gt_args()
+    args.batch_size = 20
     fixseed(args.seed)
-    max_frames = 60
-    fps = 15
-    n_frames = min(max_frames, int(args.motion_length * fps))
-    data = load_dataset(args, max_frames, n_frames)
-    iterator = iter(data)
-    _, model_kwargs = next(iterator)
+    max_frames_dict = {'kit': 196, 'humanml': 196, 'grab': 120, 'hanco': 40, 'hoi4d': 120, 'ham2pose': 150}
+    max_frames = max_frames_dict.get(args.dataset, 60)
+    fps_dict = {'kit': 12.5, 'hanco': 10, 'grab': 30, 'hoi4d': 15, 'ham2pose': 25}
+    fps = fps_dict.get(args.dataset, 20)
 
-    rot2xyz_pose_rep = 'rotvec'
+    split = 'test'
+    n_frames = max_frames  # min(max_frames, int(args.motion_length * fps))
+    test_data = get_dataset_loader(name=args.dataset,
+                                   batch_size=args.batch_size,
+                                   num_frames=n_frames,
+                                   split=split,
+                                   hml_mode='text_only',
+                                   max_seq_num=args.max_seq_num, subset=args.subset)
+    test_iterator = iter(test_data)
+    _, model_kwargs = next(test_iterator)
+
+    rot2xyz_pose_rep = 'rot6d' if args.dataset != "ham2pose" else "xyz"
     all_motions = []
+    all_captions = []
 
-    for sample in data:
-        rot2xyz_mask = model_kwargs['y']['mask'].reshape(args.batch_size, n_frames).bool()
-        tmp_rot2xyz = Rotation2xyz(device='cpu', dataset="interhand")
-        sample = tmp_rot2xyz(x=sample[0], mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True,
-                             translation=True,
+    rot2xyz_mask = model_kwargs['y']['mask'].reshape(args.batch_size, -1).bool()
+    tmp_rot2xyz = Rotation2xyz(device='cpu', dataset=args.dataset)
+
+    if args.dataset == "ham2pose":
+        pose_header_path = "/home/rotem_shalev/Ham2Pose/data/hamnosys/openpose.poseheader"
+        with open(pose_header_path, "rb") as buffer:
+            pose_header = PoseHeader.read(BufferReader(buffer.read()))
+
+    # for data in [train_data, val_data, test_data]:
+    for sample in test_iterator:
+        all_captions.append(sample[1]['y']['id'])
+
+        x = sample[0]['motion'] if isinstance(sample[0], dict) else sample[0]
+        sample = tmp_rot2xyz(x=x, mask=rot2xyz_mask, pose_rep=rot2xyz_pose_rep, glob=True, translation=True,
                              jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
                              get_rotations_back=False)
-
         all_motions.append(sample.cpu().numpy())
+        break
 
     all_motions = np.concatenate(all_motions, axis=0)
+    all_captions = np.concatenate(all_captions, axis=0)
     skeleton = paramUtil.hands_kinematic_chain
 
     sample_files = []
-    num_samples_in_out_file = 8
+    num_samples_in_out_file = 7
 
     sample_print_template, row_print_template, all_print_template, \
-    sample_file_template, row_file_template, all_file_template = construct_template_variables(args.unconstrained)
+    sample_file_template, row_file_template, all_file_template = construct_template_variables(True)
 
+    rep_files = []
     for i, motion in enumerate(all_motions):
-        rep_files = []
         motion = motion.transpose(2, 0, 1)
-        animation_save_path = os.path.join(r"/mnt/raid1/home/rotem_shalev/motion-diffusion-model/save/gt", "test.mp4")
-        plot_3d_motion(animation_save_path, skeleton, motion, dataset="interhand", title="", fps=fps)
+        animation_save_path = os.path.join(args.output_dir, split)
+        if args.dataset == "ham2pose":
+            visualize_seq(motion, pose_header, animation_save_path, all_captions[i], fps=fps)
+        else:
+            plot_3d_motion(os.path.join(animation_save_path, f"{i}.mp4"), skeleton, motion, dataset=args.dataset,
+                           title="", fps=fps)
         # Credit for visualization: https://github.com/EricGuo5513/text-to-motion
         rep_files.append(animation_save_path)
-
-        sample_files = save_multiple_samples(args, animation_save_path, row_print_template, all_print_template,
+        if i % 3 == 0 and args.dataset != "ham2pose":
+            sample_files = save_multiple_samples(args, args.output_dir, row_print_template, all_print_template,
                                              row_file_template, all_file_template, "", num_samples_in_out_file,
-                                             rep_files, sample_files, i)
+                                             rep_files, sample_files, i//3)
+            rep_files = []
 
 
-def vis_joints():
-    import json
-    import cv2
-    import matplotlib.pyplot as plt
+def get_pred(txt, length):
+    args = generate_args()
+    fixseed(args.seed)
+    max_frames = 200
+    n_frames = length
+    dist_util.setup_dist(args.device)
+    texts = [txt]
+    args.num_samples = 1
+    args.batch_size = args.num_samples
 
-    with open("/mnt/raid1/home/rotem_shalev/motion-diffusion-model/dataset/interHand/30fps_annotations/test/InterHand2"
-              ".6M_test_joint_3d.json", 'r') as f:
-        data = json.load(f)
+    print('Loading dataset...')
+    data = load_dataset(args, max_frames, n_frames, split=args.split)
 
-    all_3d_joints = []
-    for vid in data.values():
-        cur_vid = []
-        for datum in vid.values():
-            coords = np.array(datum['world_coord'])
-            coords /= 4
-            coords += 100
-            cur_vid.append(coords)
-        all_3d_joints.append(cur_vid)
+    print("Creating model and diffusion...")
+    model, diffusion = create_model_and_diffusion(args, data)
 
-    fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-    fps = 15
-    for i, vid in enumerate(all_3d_joints):
-        out = cv2.VideoWriter(f"/mnt/raid1/home/rotem_shalev/motion-diffusion-model/save/gt/coords_{i}.mp4",
-                              fourcc, fps, (400, 400))
+    print(f"Loading checkpoints from [{args.model_path}]...")
+    state_dict = torch.load(args.model_path, map_location='cpu')
+    load_model_wo_clip(model, state_dict)
+    model.to(dist_util.dev())
+    model.eval()  # disable random masking
 
-        for frame in vid:
-            cur_frame = np.full((400, 400, 3), 255, dtype=np.uint8)
-            for joint_coords in frame:
-                # TODO- add lines
-                cur_frame = cv2.circle(cur_frame, (int(joint_coords[0]), int(joint_coords[2])),
-                                   radius=1, color=(0, 0, 255), thickness=2)
-            out.write(cur_frame)
-        out.release()
-            # cv2.imshow('image', image)
-            # cv2.waitKey(0)
+    collate_args = [{'inp': torch.zeros(n_frames), 'tokens': None, 'lengths': n_frames}] * args.num_samples
+    collate_args = [dict(arg, text=txt) for arg, txt in zip(collate_args, texts)]
+    _, model_kwargs = collate(collate_args)
+
+    print(f'### Sampling motion')
+
+    if 'mask' in model_kwargs['y']:
+        padding_mask = torch.zeros((args.batch_size, 1, 1, n_frames - model_kwargs['y']['mask'].shape[-1]),
+                                   dtype=torch.bool)
+        model_kwargs['y']['mask'] = torch.cat([model_kwargs['y']['mask'], padding_mask], dim=-1).to(dist_util.dev())
+
+    sample_fn = diffusion.p_sample_loop
+
+    sample = sample_fn(
+        model,
+        (args.batch_size, model.njoints, model.nfeats, n_frames),
+        clip_denoised=False,
+        model_kwargs=model_kwargs,
+        skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
+        init_image=None,
+        progress=True,
+        dump_steps=None,
+        noise=None,
+        const_noise=False,
+    )
+
+    sample = model.rot2xyz(x=sample, mask=None, pose_rep='xyz', glob=True, translation=True,
+                           jointstype='smpl', vertstrans=True, betas=None, beta=0, glob_rot=None,
+                           get_rotations_back=False)
+
+    motion = sample.cpu().numpy().squeeze().transpose(2, 0, 1)
+    return motion
 
 
 if __name__ == "__main__":
-    main()
-    # visualize_gt()
-    # vis_joints()
+    # args example for "main":
+    # --model_path "/mnt/raid1/home/rotem_shalev/motion-diffusion-model/save/hanco_resume/model001050025.pt" --seed 1 --num_samples 10 --num_repetitions 3
+
+    # args example for "visualize_gt":
+    # --dataset hoi4d --output_dir /mnt/raid1/home/rotem_shalev/motion-diffusion-model/save/hoi4d_right/gt
+
+    if "--model_path" in sys.argv:
+        main()
+    else:
+        visualize_gt()

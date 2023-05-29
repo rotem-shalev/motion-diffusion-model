@@ -11,7 +11,7 @@ class MDM(nn.Module):
     def __init__(self, modeltype, njoints, nfeats, num_actions, translation, pose_rep, glob, glob_rot,
                  latent_dim=256, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
                  ablation=None, activation="gelu", legacy=False, data_rep='rot6d', dataset='amass', clip_dim=512,
-                 arch='trans_enc', emb_trans_dec=False, clip_version=None, **kargs):
+                 arch='trans_enc', emb_trans_dec=False, clip_version=None, tokenizer=None, **kargs):
         super().__init__()
 
         self.legacy = legacy
@@ -21,6 +21,7 @@ class MDM(nn.Module):
         self.num_actions = num_actions
         self.data_rep = data_rep
         self.dataset = dataset
+        self.tokenizer = tokenizer
 
         self.pose_rep = pose_rep
         self.glob = glob
@@ -81,11 +82,24 @@ class MDM(nn.Module):
 
         if self.cond_mode != 'no_cond':
             if 'text' in self.cond_mode:
-                self.embed_text = nn.Linear(self.clip_dim, self.latent_dim)
-                print('EMBED TEXT')
-                print('Loading CLIP...')
-                self.clip_version = clip_version
-                self.clip_model = self.load_and_freeze_clip(clip_version)
+                if self.data_rep == "ham2pose":
+                    self.max_text_len = 150
+                    self.text_embedding = nn.Embedding(len(self.tokenizer), self.latent_dim,
+                                                   padding_idx=self.tokenizer.pad_token_id)
+                    self.text_positional_embedding = nn.Embedding(num_embeddings=self.max_text_len,
+                                                                  embedding_dim=self.latent_dim)
+                    # self.project_text = nn.Linear(self.latent_dim*self.max_text_len, self.latent_dim)
+                    encoder_layer = nn.TransformerEncoderLayer(d_model=self.latent_dim, nhead=self.num_heads,
+                                                               dim_feedforward=self.ff_size)
+                    self.text_encoder = nn.TransformerEncoder(encoder_layer, num_layers=self.num_layers)
+                    # self.embed_text = nn.Linear(self.latent_dim, self.latent_dim)  # another projection layer after
+                    # text embedding, encoding, and masking
+                else:
+                    self.embed_text = nn.Linear(self.clip_dim, self.latent_dim)
+                    print('EMBED TEXT')
+                    print('Loading CLIP...')
+                    self.clip_version = clip_version
+                    self.clip_model = self.load_and_freeze_clip(clip_version)
             if 'action' in self.cond_mode:
                 self.embed_action = EmbedAction(self.num_actions, self.latent_dim)
                 print('EMBED ACTION')
@@ -111,24 +125,42 @@ class MDM(nn.Module):
         return clip_model
 
     def mask_cond(self, cond, force_mask=False):
-        bs, d = cond.shape
+        bs = cond.shape[0]
         if force_mask:
             return torch.zeros_like(cond)
         elif self.training and self.cond_mask_prob > 0.:
             mask = torch.bernoulli(torch.ones(bs, device=cond.device) * self.cond_mask_prob).view(bs, 1)  # 1-> use null_cond, 0-> use real cond
+            if len(cond.shape) == 3:
+                mask = mask.view(bs, 1, 1)
             return cond * (1. - mask)
         else:
             return cond
 
     def encode_text(self, raw_text):
-        # raw_text - list (batch_size length) of strings with input text prompts
         device = next(self.parameters()).device
-        max_text_len = 20 if self.dataset in ['humanml', 'kit'] else None  # Specific hardcoding for humanml dataset
+
+        if self.data_rep == "ham2pose":
+            tokenized_text = self.tokenizer(raw_text, device=device)
+            pe = self.text_positional_embedding(tokenized_text["positions"])
+            embedded_text = self.text_embedding(tokenized_text["tokens_ids"]) + pe
+            encoded_text = self.text_encoder(embedded_text.transpose(0, 1), src_key_padding_mask=tokenized_text[
+                "attention_mask"])#.transpose(0, 1)
+
+            # zero_pad = torch.zeros([encoded_text.shape[0], self.max_text_len - encoded_text.shape[1],
+            #                         encoded_text.shape[2]], dtype=encoded_text.dtype, device=encoded_text.device)
+            # padded_text = torch.cat([encoded_text, zero_pad], dim=1)
+            # projected_text = self.project_text(padded_text.view(encoded_text.shape[0], -1))
+            return encoded_text, tokenized_text["attention_mask"]
+
+        # raw_text - list (batch_size length) of strings with input text prompts
+        max_text_len = 20 if self.dataset in ['humanml', 'kit'] else None  # Specific hardcoding for
+        # humanml dataset
         if max_text_len is not None:
             default_context_length = 77
-            context_length = max_text_len + 2 # start_token + 20 + end_token
+            context_length = max_text_len + 2  # start_token + 20 + end_token
             assert context_length < default_context_length
-            texts = clip.tokenize(raw_text, context_length=context_length, truncate=True).to(device) # [bs, context_length] # if n_tokens > context_length -> will truncate
+            texts = clip.tokenize(raw_text, context_length=context_length, truncate=True).to(device)  # [bs,
+            # context_length] # if n_tokens > context_length -> will truncate
             # print('texts', texts.shape)
             zero_pad = torch.zeros([texts.shape[0], default_context_length-context_length], dtype=texts.dtype, device=texts.device)
             texts = torch.cat([texts, zero_pad], dim=1)
@@ -148,7 +180,13 @@ class MDM(nn.Module):
         force_mask = y.get('uncond', False)
         if 'text' in self.cond_mode:
             enc_text = self.encode_text(y['text'])
-            emb += self.embed_text(self.mask_cond(enc_text, force_mask=force_mask))
+            if self.data_rep == "ham2pose":
+                enc_text, text_mask = enc_text
+            masked_cond = self.mask_cond(enc_text, force_mask=force_mask)
+            if self.data_rep == "ham2pose":
+                emb = torch.cat([emb, masked_cond], dim=0)
+            else:
+                emb += self.embed_text(masked_cond)
         if 'action' in self.cond_mode:
             action_emb = self.embed_action(y['action'])
             emb += self.mask_cond(action_emb, force_mask=force_mask)
@@ -158,19 +196,23 @@ class MDM(nn.Module):
             emb_gru = emb.repeat(nframes, 1, 1)     #[#frames, bs, d]
             emb_gru = emb_gru.permute(1, 2, 0)      #[bs, d, #frames]
             emb_gru = emb_gru.reshape(bs, self.latent_dim, 1, nframes)  #[bs, d, 1, #frames]
-            x = torch.cat((x_reshaped, emb_gru), axis=1)  #[bs, d+joints*feat, 1, #frames]
+            x = torch.cat((x_reshaped, emb_gru), dim=1)  #[bs, d+joints*feat, 1, #frames]
 
         x = self.input_process(x)
 
         if self.arch == 'trans_enc':
             # adding the timestep embed
-            xseq = torch.cat((emb, x), axis=0)  # [seqlen+1, bs, d]
-            xseq = self.sequence_pos_encoder(xseq)  # [seqlen+1, bs, d]
-            output = self.seqTransEncoder(xseq)[1:]  # , src_key_padding_mask=~maskseq)  # [seqlen, bs, d]
-
+            x = self.sequence_pos_encoder(x)
+            xseq = torch.cat((emb, x), dim=0)  # [seqlen+1, bs, d]
+            # xseq = self.sequence_pos_encoder(xseq)  # [seqlen+1, bs, d]
+            mask = torch.logical_not(y['mask'].squeeze(1).squeeze(1))
+            if self.data_rep == "ham2pose":
+                step_mask = torch.zeros((bs, 1), dtype=torch.bool, device=x.device)
+                mask = torch.cat([step_mask, text_mask, mask], dim=1)
+            output = self.seqTransEncoder(xseq, src_key_padding_mask=mask)[-len(x):]
         elif self.arch == 'trans_dec':
             if self.emb_trans_dec:
-                xseq = torch.cat((emb, x), axis=0)
+                xseq = torch.cat((emb, x), dim=0)
             else:
                 xseq = x
             xseq = self.sequence_pos_encoder(xseq)  # [seqlen+1, bs, d]
@@ -185,7 +227,6 @@ class MDM(nn.Module):
 
         output = self.output_process(output)  # [bs, njoints, nfeats, nframes]
         return output
-
 
     def _apply(self, fn):
         super()._apply(fn)
@@ -248,7 +289,7 @@ class InputProcess(nn.Module):
         bs, njoints, nfeats, nframes = x.shape
         x = x.permute((3, 0, 1, 2)).reshape(nframes, bs, njoints*nfeats)
 
-        if self.data_rep in ['rot6d', 'xyz', 'hml_vec']:
+        if self.data_rep in ['rot6d', 'xyz', 'hml_vec', 'ham2pose']:
             x = self.poseEmbedding(x)  # [seqlen, bs, d]
             return x
         elif self.data_rep == 'rot_vel':
@@ -275,7 +316,7 @@ class OutputProcess(nn.Module):
 
     def forward(self, output):
         nframes, bs, d = output.shape
-        if self.data_rep in ['rot6d', 'xyz', 'hml_vec']:
+        if self.data_rep in ['rot6d', 'xyz', 'hml_vec', 'ham2pose']:
             output = self.poseFinal(output)  # [seqlen, bs, 150]
         elif self.data_rep == 'rot_vel':
             first_pose = output[[0]]  # [1, bs, d]

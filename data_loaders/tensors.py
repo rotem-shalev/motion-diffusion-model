@@ -1,5 +1,6 @@
 import torch
 
+
 def lengths_to_mask(lengths, max_len):
     # max_len = max(lengths)
     mask = torch.arange(max_len, device=lengths.device).expand(len(lengths), max_len) < lengths.unsqueeze(1)
@@ -27,17 +28,26 @@ def collate(batch):
     else:
         lenbatch = [len(b['inp'][0][0]) for b in notnone_batches]
 
-
     databatchTensor = collate_tensors(databatch)
     lenbatchTensor = torch.as_tensor(lenbatch)
-    maskbatchTensor = lengths_to_mask(lenbatchTensor, databatchTensor.shape[-1]).unsqueeze(1).unsqueeze(1) # unqueeze for broadcasting
+    # unqueeze for broadcasting
+    maskbatchTensor = lengths_to_mask(lenbatchTensor, databatchTensor.shape[-1]).unsqueeze(1).unsqueeze(1)
 
-    motion = databatchTensor
+    if 'confidence' in notnone_batches[0]:
+        confbatchTensor = collate_tensors([b['confidence'] for b in notnone_batches])
+        motion = {'motion': databatchTensor, 'confidence': confbatchTensor}
+    else:
+        motion = databatchTensor
+
     cond = {'y': {'mask': maskbatchTensor, 'lengths': lenbatchTensor}}
 
     if 'text' in notnone_batches[0]:
         textbatch = [b['text'] for b in notnone_batches]
         cond['y'].update({'text': textbatch})
+
+    if 'id' in notnone_batches[0]:
+        textbatch = [b['id'] for b in notnone_batches]
+        cond['y'].update({'id': textbatch})
 
     if 'tokens' in notnone_batches[0]:
         textbatch = [b['tokens'] for b in notnone_batches]
@@ -54,11 +64,12 @@ def collate(batch):
 
     return motion, cond
 
+
 # an adapter to our collate func
 def t2m_collate(batch):
     # batch.sort(key=lambda x: x[3], reverse=True)
     adapted_batch = [{
-        'inp': torch.tensor(b[4].T).float().unsqueeze(1), # [seqlen, J] -> [J, 1, seqlen]
+        'inp': torch.tensor(b[4].T).float().unsqueeze(1),  # [seqlen, J] -> [J, 1, seqlen]
         'text': b[2], #b[0]['caption']
         'tokens': b[6],
         'lengths': b[5],

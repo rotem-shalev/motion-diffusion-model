@@ -45,6 +45,7 @@ def get_args_per_group_name(parser, args, group_name):
             return list(argparse.Namespace(**group_dict).__dict__.keys())
     return ValueError('group_name was not found.')
 
+
 def get_model_path_from_args():
     try:
         dummy_parser = ArgumentParser()
@@ -90,19 +91,28 @@ def add_model_options(parser):
     group.add_argument("--lambda_rcxyz", default=0.0, type=float, help="Joint positions loss.")
     group.add_argument("--lambda_vel", default=0.0, type=float, help="Joint velocity loss.")
     group.add_argument("--lambda_fc", default=0.0, type=float, help="Foot contact loss.")
+    group.add_argument("--step_weight", default=False, type=bool, help="use step weights in loss function. only "
+                                                                       "relevant for 'ham2pose' dataset")
     group.add_argument("--unconstrained", action='store_true',
                        help="Model is trained unconditionally. That is, it is constrained by neither text nor action. "
                             "Currently tested on HumanAct12 only.")
 
 
-
 def add_data_options(parser):
     group = parser.add_argument_group('dataset')
-    group.add_argument("--dataset", default='humanml', choices=['humanml', 'kit', 'humanact12', 'uestc', 'interhand'],
+    group.add_argument("--dataset", default='humanml', choices=['humanml', 'kit', 'humanact12', 'uestc', 'interhand',
+                                                                'hanco', 'grab', 'hoi4d', 'all_hands', 'ham2pose'],
                        type=str,
                        help="Dataset name (choose from list).")
+    group.add_argument("--subset", default="", type=str,
+                       help="Only used if dataset is 'all_hands'. If empty, will use all hands datasets"
+                            "dataset.")
     group.add_argument("--data_dir", default="", type=str,
                        help="If empty, will use defaults according to the specified dataset.")
+    group.add_argument("--max_seq_num", default=1000000, type=int,
+                       help="Limit for the maximal number of sequences. Mostly for debugging.")
+    group.add_argument("--use_how2sign", action='store_true',
+                       help="Weather or not to use how2sign data. only applicable for ham2pose dataset.")
 
 
 def add_training_options(parser):
@@ -155,6 +165,20 @@ def add_sampling_options(parser):
                        help="For classifier-free sampling - specifies the s parameter, as defined in the paper.")
 
 
+def add_gt_sampling_options(parser):
+    group = parser.add_argument_group('sampling')
+    group.add_argument("--output_dir", default='', type=str,
+                       help="Path to results dir (auto created by the script). "
+                            "If empty, will create dir in parallel to checkpoint.")
+    group.add_argument("--num_samples", default=10, type=int,
+                       help="Maximal number of prompts to sample, "
+                            "if loading dataset from file, this field will be ignored.")
+    group.add_argument("--num_repetitions", default=3, type=int,
+                       help="Number of repetitions, per sample (text prompt/action)")
+    group.add_argument("--guidance_param", default=2.5, type=float,
+                       help="For classifier-free sampling - specifies the s parameter, as defined in the paper.")
+
+
 def add_generate_options(parser):
     group = parser.add_argument_group('generate')
     group.add_argument("--motion_length", default=6.0, type=float,
@@ -170,6 +194,8 @@ def add_generate_options(parser):
                        help="A text prompt to be generated. If empty, will take text prompts from dataset.")
     group.add_argument("--action_name", default='', type=str,
                        help="An action name to be generated. If empty, will take text prompts from dataset.")
+    group.add_argument("--split", default="test", type=str,
+                       help="split to generate examples from. default is test")
 
 
 def add_edit_options(parser):
@@ -209,6 +235,18 @@ def train_args():
     add_model_options(parser)
     add_diffusion_options(parser)
     add_training_options(parser)
+    args = parser.parse_args()
+    if args.subset != "" and args.dataset == "all_hands":
+        args.subset = args.subset.split(", ")
+    return args
+
+
+def vis_gt_args():
+    parser = ArgumentParser()
+    add_base_options(parser)
+    add_data_options(parser)
+    add_gt_sampling_options(parser)
+    add_generate_options(parser)
     return parser.parse_args()
 
 

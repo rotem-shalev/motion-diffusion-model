@@ -62,8 +62,10 @@ def plot_3d_motion(save_path, kinematic_tree, joints, title, dataset, figsize=(3
         data *= 1.3  # scale for visualization
     elif dataset in ['humanact12', 'uestc']:
         data *= -1.5  # reverse axes, scale for visualization
-    elif dataset == 'interhand':
+    elif dataset in ['interhand', 'hanco', 'hoi4d', 'all_hands']:
         data *= 10  # scale for visualization
+    elif dataset == 'grab':
+        data *= 4  # scale for visualization
 
     fig = plt.figure(figsize=figsize)
     plt.tight_layout()
@@ -111,10 +113,10 @@ def plot_3d_motion(save_path, kinematic_tree, joints, title, dataset, figsize=(3
 
         used_colors = colors_blue if index in gt_frames else colors
         for i, (chain, color) in enumerate(zip(kinematic_tree, used_colors)):
-            if i < 5:
-                linewidth = 4.0
-            else:
-                linewidth = 2.0
+            # if i < 5:
+            #     linewidth = 4.0
+            # else:
+            linewidth = 2.0
             ax.plot3D(data[index, chain, 0], data[index, chain, 1], data[index, chain, 2], linewidth=linewidth,
                       color=color)
         #         print(trajec[:index, 0].shape)

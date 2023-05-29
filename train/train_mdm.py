@@ -17,6 +17,7 @@ from data_loaders.get_data import get_dataset_loader
 from utils.model_util import create_model_and_diffusion
 from train.train_platforms import ClearmlPlatform, TensorboardPlatform, NoPlatform  # required for the eval operation
 
+
 def main():
     args = train_args()
     fixseed(args.seed)
@@ -37,7 +38,8 @@ def main():
     dist_util.setup_dist(args.device)
 
     print("creating data loader...")
-    data = get_dataset_loader(name=args.dataset, batch_size=args.batch_size, num_frames=args.num_frames)
+    data = get_dataset_loader(name=args.dataset, batch_size=args.batch_size, num_frames=args.num_frames,
+                              max_seq_num=args.max_seq_num, subset=args.subset)
 
     print("creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(args, data)

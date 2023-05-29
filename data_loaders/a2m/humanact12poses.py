@@ -7,7 +7,7 @@ from .dataset import Dataset
 class HumanAct12Poses(Dataset):
     dataname = "humanact12"
 
-    def __init__(self, datapath="../dataset/HumanAct12Poses", split="train", **kargs):
+    def __init__(self, datapath="dataset/HumanAct12Poses", split="train", **kargs):
         self.datapath = datapath
 
         super().__init__(**kargs)

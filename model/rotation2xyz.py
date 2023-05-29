@@ -11,7 +11,7 @@ class Rotation2xyz:
     def __init__(self, device, dataset='amass'):
         self.device = device
         self.dataset = dataset
-        if self.dataset == 'interhand':
+        if self.dataset in ['interhand', 'hanco', 'grab', 'hoi4d', 'all_hands', 'ham2pose']:
             self.smpl_model = SMPL(SMPL_MANO_MODEL_PATH).eval().to(device)
         else:
             self.smpl_model = SMPL().eval().to(device)
@@ -78,7 +78,7 @@ class Rotation2xyz:
 
         # the first translation root at the origin on the prediction
         if jointstype != "vertices":
-            rootindex = 15 #JOINTSTYPE_ROOT[jointstype] # wrist is last index
+            rootindex = JOINTSTYPE_ROOT[jointstype]
             x_xyz = x_xyz - x_xyz[:, [rootindex], :, :]
 
         if translation and vertstrans:

@@ -82,13 +82,12 @@ class Text2MotionDataset(data.Dataset):
                 if flag:
                     data_dict[name] = {'motion': motion,
                                        'length': len(motion),
-                                       'text':text_data}
+                                       'text': text_data}
                     new_name_list.append(name)
                     length_list.append(len(motion))
             except:
                 # Some motion may not exist in KIT dataset
                 pass
-
 
         name_list, length_list = zip(*sorted(zip(new_name_list, length_list), key=lambda x: x[1]))
 
@@ -255,7 +254,7 @@ class Text2MotionDatasetV2(data.Dataset):
                                     new_name = random.choice('ABCDEFGHIJKLMNOPQRSTUVW') + '_' + name
                                 data_dict[new_name] = {'motion': n_motion,
                                                        'length': len(n_motion),
-                                                       'text':[text_dict]}
+                                                       'text': [text_dict]}
                                 new_name_list.append(new_name)
                                 length_list.append(len(n_motion))
                             except:
