@@ -113,6 +113,9 @@ def add_data_options(parser):
                        help="Limit for the maximal number of sequences. Mostly for debugging.")
     group.add_argument("--use_how2sign", action='store_true',
                        help="Weather or not to use how2sign data. only applicable for ham2pose dataset.")
+    group.add_argument("--split_repeat", action='store_true',
+                       help="Weather or not to convert 'hamrepeatfromstart' to clones of text before repeat. "
+                            "only applicable for ham2pose dataset.")
 
 
 def add_training_options(parser):

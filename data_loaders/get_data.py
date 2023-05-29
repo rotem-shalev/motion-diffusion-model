@@ -52,22 +52,25 @@ def get_collate_fn(name, hml_mode='train'):
         return all_collate
 
 
-def get_dataset(name, num_frames, split='train', hml_mode='train', max_seq_num=inf, subset="", use_how2sign=False):
+def get_dataset(name, num_frames, split='train', hml_mode='train', max_seq_num=inf, subset="", use_how2sign=False,
+                split_repeat=False):
     DATA = get_dataset_class(name)
     if name in ["humanml", "kit"]:
         dataset = DATA(split=split, num_frames=num_frames, mode=hml_mode)
     elif name == "all_hands":
         dataset = DATA(split=split, num_frames=num_frames, max_seq_num=max_seq_num, subset=subset)
     elif name == "ham2pose":
-        dataset = DATA(split=split, num_frames=num_frames, max_seq_num=max_seq_num, use_how2sign=use_how2sign)
+        dataset = DATA(split=split, num_frames=num_frames, max_seq_num=max_seq_num, use_how2sign=use_how2sign,
+                       split_repeat=split_repeat)
     else:
         dataset = DATA(split=split, num_frames=num_frames, max_seq_num=max_seq_num)
     return dataset
 
 
 def get_dataset_loader(name, batch_size, num_frames, split='train', hml_mode='train', max_seq_num=inf, subset="",
-                       use_how2sign=False):
-    dataset = get_dataset(name, num_frames, split, hml_mode, max_seq_num=max_seq_num, subset=subset, use_how2sign=use_how2sign)
+                       use_how2sign=False, split_repeat=False):
+    dataset = get_dataset(name, num_frames, split, hml_mode, max_seq_num=max_seq_num, subset=subset,
+                          use_how2sign=use_how2sign, split_repeat=split_repeat)
     collate = get_collate_fn(name, hml_mode)
 
     loader = DataLoader(

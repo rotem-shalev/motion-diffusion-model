@@ -288,7 +288,8 @@ def load_dataset(args, max_frames, n_frames, subset=None, split='test'):
                               split=split,
                               hml_mode='text_only',
                               subset=subset,
-                              max_seq_num=args.max_seq_num)
+                              max_seq_num=args.max_seq_num,
+                              split_repeat=args.split_repeat)
     data.fixed_length = n_frames
     return data
 

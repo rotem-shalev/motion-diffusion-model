@@ -16,7 +16,8 @@ class Ham2Pose(Dataset):
     dataname = "ham2pose"
 
     def __init__(self, split="train", num_frames=inf, min_len=1, max_len=200, max_seq_num=inf,
-                 sampling="conseq", sampling_step=1, pose_rep="xyz", use_how2sign=False, augment_rate=0.0):
+                 sampling="conseq", sampling_step=1, pose_rep="xyz", use_how2sign=False, augment_rate=0.0,
+                 split_repeat=False):
 
         super().__init__()
 
@@ -27,7 +28,7 @@ class Ham2Pose(Dataset):
         self.max_len = max_len
         self.max_seq_num = max_seq_num  # allow limitation for testing
 
-        with open("/mnt/raid1/home/rotem_shalev/motion-diffusion-model/dataset/ham2pose_processed_dataset_no_conf_th.pkl",
+        with open("/mnt/raid1/home/rotem_shalev/motion-diffusion-model/dataset/ham2pose_processed_dataset_2.pkl",
                   'rb') as f:
             data = pkl.load(f)
         self.data = data[split]
@@ -49,7 +50,7 @@ class Ham2Pose(Dataset):
         self.sampling_step = sampling_step
         self.augment_rate = augment_rate
         self.pose_rep = pose_rep
-        self.tokenizer = HamNoSysTokenizer()
+        self.tokenizer = HamNoSysTokenizer(split_repeat)
 
     def __getitem__(self, index):
         data_index = self._data_ind[index]

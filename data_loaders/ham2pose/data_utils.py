@@ -224,7 +224,7 @@ def pad(vec, size):
     return np.concatenate([vec, np.zeros(size-len(vec))]).reshape(-1, 1)
 
 
-def get_k_most_similar(txt, k, id="", method="text"):
+def get_k_most_similar(txt, k, id="", method="text", split="test"):
     with open("/mnt/raid1/home/rotem_shalev/motion-diffusion-model/dataset/ham2pose_processed_dataset_2.pkl",
               'rb') as f:
         data = pkl.load(f)
@@ -233,7 +233,7 @@ def get_k_most_similar(txt, k, id="", method="text"):
     fname = f"eval/ham2pose/videos/{k}_most_similar.mp4"
 
     if id:
-        length = [len(d["pose"].body.data) for d in data["test"] if d["id"] == id][0]
+        length = [len(d["pose"].body.data) for d in data[split] if d["id"] == id][0]
         fname = f"eval/ham2pose/videos/{id}_{k}_most_similar.mp4"
     pred = convert_pred_to_pose(get_pred(txt, length))
 
@@ -264,6 +264,7 @@ if __name__ == "__main__":
     # get_meineDGS_data()
     # process_text("/mnt/raid1/home/rotem_shalev/motion-diffusion-model/data_loaders/ham2pose/meineDGS/srt")
     # add_hamnosys_text("/home/rotem_shalev/Ham2Pose/data/hamnosys/data.json")
-    txt = "\ue0e9\ue0dd\ue0c7\ue005\ue00c\ue011\ue020\ue03e\ue0e2\ue06a\ue0e7\ue050\ue059\ue0e3\ue080\ue0c6\ue0d8"
-    id = "pjm_1486"
-    get_k_most_similar(txt, k=5, id=id, method="text")
+    txt = "\ue005\ue00e\ue020\ue03e\ue049\ue059\ue0e0\ue0d1\ue075\ue0e1\ue0e2\ue083\ue0aa\ue053\ue007\ue010\ue028\ue03c" \
+          "\ue0e3"
+    id = "pjm_1189"
+    get_k_most_similar(txt, k=5, id=id, method="text", split="test")
