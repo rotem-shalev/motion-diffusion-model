@@ -97,7 +97,7 @@ class TrainLoop:
                     args.eval_num_samples, scale=1.,
                 )
             }
-        self.use_ddp = False
+        self.use_ddp = args.use_ddp
         self.ddp_model = self.model
 
     def _load_and_sync_parameters(self):
