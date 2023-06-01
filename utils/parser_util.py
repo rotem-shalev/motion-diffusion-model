@@ -91,6 +91,7 @@ def add_model_options(parser):
     group.add_argument("--lambda_rcxyz", default=0.0, type=float, help="Joint positions loss.")
     group.add_argument("--lambda_vel", default=0.0, type=float, help="Joint velocity loss.")
     group.add_argument("--lambda_fc", default=0.0, type=float, help="Foot contact loss.")
+    group.add_argument("--loss_scale", default=1.0, type=float, help="loss scale.")
     group.add_argument("--step_weight", default=False, type=bool, help="use step weights in loss function. only "
                                                                        "relevant for 'ham2pose' dataset")
     group.add_argument("--unconstrained", action='store_true',
@@ -115,6 +116,12 @@ def add_data_options(parser):
                        help="Weather or not to use how2sign data. only applicable for ham2pose dataset.")
     group.add_argument("--split_repeat", action='store_true',
                        help="Weather or not to convert 'hamrepeatfromstart' to clones of text before repeat. "
+                            "only applicable for ham2pose dataset.")
+    group.add_argument("--split_move_direction", action='store_true',
+                       help="Weather or not to split hamnosys of move from direction. "
+                            "only applicable for ham2pose dataset.")
+    group.add_argument("--confidence_power", default=1.0, type=float,
+                       help="power to raise the confidence by. default is 1 (no change). "
                             "only applicable for ham2pose dataset.")
 
 

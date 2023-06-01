@@ -11,7 +11,7 @@ from pose_format.numpy.pose_body import NumPyPoseBody
 from sklearn.model_selection import train_test_split
 
 
-MIN_CONFIDENCE = 0 #0.2
+MIN_CONFIDENCE = 0.2
 NUM_FACE_KEYPOINTS = 70
 MAX_SEQ_LEN = 200
 
@@ -231,7 +231,7 @@ def process_all_data(data, dup_keys, pjm_left_videos, keypoints_dir_path, fps=25
     train_data, val_data = train_test_split(train_data, test_size=0.1, random_state=42)
     train_data += dup_dataset
 
-    with open("/mnt/raid1/home/rotem_shalev/motion-diffusion-model/dataset/ham2pose_processed_dataset_no_conf_th.pkl",
+    with open("/mnt/raid1/home/rotem_shalev/motion-diffusion-model/dataset/ham2pose_processed_dataset_3.pkl",
               'wb') as f:
         pkl.dump({"train": train_data, "val": val_data, "test": test_data}, f)
 

@@ -55,7 +55,7 @@ def get_model_args(args, data):
         data_rep = 'ham2pose'
         pose_rep = 'xyz'
         from data_loaders.ham2pose.hamnosys_tokenizer import HamNoSysTokenizer
-        tokenizer = HamNoSysTokenizer()
+        tokenizer = HamNoSysTokenizer(args.split_repeat, args.split_move_direction)
 
     return {'modeltype': '', 'njoints': njoints, 'nfeats': nfeats, 'num_actions': num_actions,
             'translation': True, 'pose_rep': pose_rep, 'glob': True, 'glob_rot': True,
@@ -101,5 +101,6 @@ def create_gaussian_diffusion(args):
         lambda_vel=args.lambda_vel,
         lambda_rcxyz=args.lambda_rcxyz,
         lambda_fc=args.lambda_fc,
-        step_weight=args.step_weight
+        step_weight=args.step_weight,
+        loss_scale=args.loss_scale
     )

@@ -83,7 +83,7 @@ class MDM(nn.Module):
         if self.cond_mode != 'no_cond':
             if 'text' in self.cond_mode:
                 if self.data_rep == "ham2pose":
-                    self.max_text_len = 150
+                    self.max_text_len = 300 # TODO- changed from 150 to 300 for split_repeat- make condition
                     self.text_embedding = nn.Embedding(len(self.tokenizer), self.latent_dim,
                                                    padding_idx=self.tokenizer.pad_token_id)
                     self.text_positional_embedding = nn.Embedding(num_embeddings=self.max_text_len,

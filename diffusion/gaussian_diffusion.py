@@ -138,6 +138,7 @@ class GaussianDiffusion:
             lambda_fc=0.,
             lambda_touch=0.,
             step_weight=False,
+            loss_scale=1.,
     ):
         self.model_mean_type = model_mean_type
         self.model_var_type = model_var_type
@@ -158,6 +159,7 @@ class GaussianDiffusion:
         self.lambda_fc = lambda_fc
         self.lambda_touch = lambda_touch
         self.step_weight = step_weight
+        self.loss_scale = loss_scale
 
         if self.lambda_rcxyz > 0. or self.lambda_vel > 0. or self.lambda_root_vel > 0. or \
                 self.lambda_vel_rcxyz > 0. or self.lambda_fc > 0. or self.lambda_touch:
@@ -202,7 +204,8 @@ class GaussianDiffusion:
                 / (1.0 - self.alphas_cumprod)
         )
 
-        self.l2_loss = lambda a, b: (a - b) ** 2  # th.nn.MSELoss(reduction='none')  # must be None for handling mask later on.
+        self.l2_loss = lambda a, b: (
+                                                a - b) ** 2  # th.nn.MSELoss(reduction='none')  # must be None for handling mask later on.
 
     def masked_l2(self, a, b, mask):
         # assuming a.shape == b.shape == bs, J, Jdim, seqlen
@@ -1361,10 +1364,7 @@ class GaussianDiffusion:
                                                   mask[..., 1:])  # mean_flat((target_vel - model_output_vel) ** 2)
 
             if self.lambda_touch > 0.:
-                touch_idx = []
-                if '\ue007' in model_kwargs['y']['text']:  # hampinch12
-                    touch_idx.append((22, 26))  # TODO- how do I know if it should be left/right/both?
-                # TODO- force touch if touch in hamnosys, I have access to text through: model_kwargs['y']
+                pass
 
             terms["loss"] = terms["rot_mse"] + terms.get('vb', 0.) + \
                             (self.lambda_vel * terms.get('vel_mse', 0.)) + \
@@ -1372,6 +1372,7 @@ class GaussianDiffusion:
                             (self.lambda_fc * terms.get('fc', 0.)) + \
                             (self.lambda_touch * terms.get('touch', 0.))
 
+            terms["loss"] *= self.loss_scale
 
         else:
             raise NotImplementedError(self.loss_type)

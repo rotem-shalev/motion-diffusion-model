@@ -17,7 +17,7 @@ class Ham2Pose(Dataset):
 
     def __init__(self, split="train", num_frames=inf, min_len=1, max_len=200, max_seq_num=inf,
                  sampling="conseq", sampling_step=1, pose_rep="xyz", use_how2sign=False, augment_rate=0.0,
-                 split_repeat=False):
+                 conf_power=1.0):
 
         super().__init__()
 
@@ -28,7 +28,7 @@ class Ham2Pose(Dataset):
         self.max_len = max_len
         self.max_seq_num = max_seq_num  # allow limitation for testing
 
-        with open("/mnt/raid1/home/rotem_shalev/motion-diffusion-model/dataset/ham2pose_processed_dataset_2.pkl",
+        with open("/mnt/raid1/home/rotem_shalev/motion-diffusion-model/dataset/ham2pose_processed_dataset_3.pkl",
                   'rb') as f:
             data = pkl.load(f)
         self.data = data[split]
@@ -50,7 +50,7 @@ class Ham2Pose(Dataset):
         self.sampling_step = sampling_step
         self.augment_rate = augment_rate
         self.pose_rep = pose_rep
-        self.tokenizer = HamNoSysTokenizer(split_repeat)
+        self.conf_power = conf_power
 
     def __getitem__(self, index):
         data_index = self._data_ind[index]
@@ -68,6 +68,7 @@ class Ham2Pose(Dataset):
         pose_data = self.data[ind]['pose'].body
         pose = torch.from_numpy(pose_data.data).squeeze(1)
         conf = torch.from_numpy(pose_data.confidence).squeeze(1)
+        conf = conf**self.conf_power
         pose = pose.permute(1, 2, 0).contiguous()
         conf = conf.permute(1, 0).contiguous()
         return pose, conf
@@ -76,9 +77,5 @@ class Ham2Pose(Dataset):
         pose, conf = self.get_pose_data(data_index)
         text = self.data[data_index]["hamnosys"]
         output = {'inp': pose, 'confidence': conf, "text": text, "id": self.data[data_index]["id"]}
-        # if torch.rand(1) < self.augment_rate:
-        #     if '\ue002' in text:  # convert hamfinger2 to hamfinger3
-        #         text = text.replace('\ue002', '\ue003')
-        #
         return output
 
