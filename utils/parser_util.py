@@ -84,6 +84,10 @@ def add_model_options(parser):
                             " (in addition to cross-attention).")
     group.add_argument("--layers", default=8, type=int,
                        help="Number of layers.")
+    group.add_argument("--num_input_layers", default=1, type=int, choices=[1, 2],
+                       help="Number of input layers.")
+    group.add_argument("--num_output_layers", default=1, type=int, choices=[1, 2],
+                       help="Number of output layers.")
     group.add_argument("--latent_dim", default=512, type=int,
                        help="Transformer/GRU width.")
     group.add_argument("--cond_mask_prob", default=.1, type=float,

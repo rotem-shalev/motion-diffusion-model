@@ -4,14 +4,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import clip
 from model.rotation2xyz import Rotation2xyz
-
+from utils import dist_util
 
 
 class MDM(nn.Module):
     def __init__(self, modeltype, njoints, nfeats, num_actions, translation, pose_rep, glob, glob_rot,
-                 latent_dim=256, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1,
-                 ablation=None, activation="gelu", legacy=False, data_rep='rot6d', dataset='amass', clip_dim=512,
-                 arch='trans_enc', emb_trans_dec=False, clip_version=None, tokenizer=None, **kargs):
+                 latent_dim=256, ff_size=1024, num_layers=8, num_heads=4, dropout=0.1, num_input_layers=1,
+                 num_output_layers=1, ablation=None, activation="gelu", legacy=False, data_rep='rot6d',
+                 dataset='amass', clip_dim=512, arch='trans_enc', emb_trans_dec=False, clip_version=None,
+                 tokenizer=None, **kargs):
         super().__init__()
 
         self.legacy = legacy
@@ -32,6 +33,8 @@ class MDM(nn.Module):
 
         self.ff_size = ff_size
         self.num_layers = num_layers
+        self.num_input_layers = num_input_layers
+        self.num_output_layers = num_output_layers
         self.num_heads = num_heads
         self.dropout = dropout
 
@@ -48,7 +51,7 @@ class MDM(nn.Module):
         self.cond_mask_prob = kargs.get('cond_mask_prob', 0.)
         self.arch = arch
         self.gru_emb_dim = self.latent_dim if self.arch == 'gru' else 0
-        self.input_process = InputProcess(self.data_rep, self.input_feats+self.gru_emb_dim, self.latent_dim)
+        self.input_process = InputProcess(self.data_rep, self.input_feats+self.gru_emb_dim, self.latent_dim, self.num_input_layers)
 
         self.sequence_pos_encoder = PositionalEncoding(self.latent_dim, self.dropout)
         self.emb_trans_dec = emb_trans_dec
@@ -105,7 +108,7 @@ class MDM(nn.Module):
                 print('EMBED ACTION')
 
         self.output_process = OutputProcess(self.data_rep, self.input_feats, self.latent_dim, self.njoints,
-                                            self.nfeats)
+                                            self.nfeats, self.num_output_layers)
         self.rot2xyz = Rotation2xyz(device='cpu', dataset=self.dataset)
 
     def parameters_wo_clip(self):
@@ -137,7 +140,7 @@ class MDM(nn.Module):
             return cond
 
     def encode_text(self, raw_text):
-        device = next(self.parameters()).device
+        device = dist_util.dev()
 
         if self.data_rep == "ham2pose":
             tokenized_text = self.tokenizer(raw_text, device=device)
@@ -276,12 +279,19 @@ class TimestepEmbedder(nn.Module):
 
 
 class InputProcess(nn.Module):
-    def __init__(self, data_rep, input_feats, latent_dim):
+    def __init__(self, data_rep, input_feats, latent_dim, num_input_layers):
         super().__init__()
         self.data_rep = data_rep
         self.input_feats = input_feats
         self.latent_dim = latent_dim
-        self.poseEmbedding = nn.Linear(self.input_feats, self.latent_dim)
+        if num_input_layers == 1:
+            self.poseEmbedding = nn.Linear(self.input_feats, self.latent_dim)
+        else:
+            self.poseEmbedding = nn.Sequential(
+                nn.Linear(self.input_feats, self.latent_dim),
+                nn.SiLU(),
+                nn.Linear(self.latent_dim, self.latent_dim)
+            )
         if self.data_rep == 'rot_vel':
             self.velEmbedding = nn.Linear(self.input_feats, self.latent_dim)
 
@@ -303,14 +313,21 @@ class InputProcess(nn.Module):
 
 
 class OutputProcess(nn.Module):
-    def __init__(self, data_rep, input_feats, latent_dim, njoints, nfeats):
+    def __init__(self, data_rep, input_feats, latent_dim, njoints, nfeats, num_output_layers):
         super().__init__()
         self.data_rep = data_rep
         self.input_feats = input_feats
         self.latent_dim = latent_dim
         self.njoints = njoints
         self.nfeats = nfeats
-        self.poseFinal = nn.Linear(self.latent_dim, self.input_feats)
+        if num_output_layers == 1:
+            self.poseFinal = nn.Linear(self.latent_dim, self.input_feats)
+        else:
+            self.poseFinal = nn.Sequential(
+                nn.Linear(self.latent_dim, self.latent_dim),
+                nn.SiLU(),
+                nn.Linear(self.latent_dim, self.input_feats)
+            )
         if self.data_rep == 'rot_vel':
             self.velFinal = nn.Linear(self.latent_dim, self.input_feats)
 

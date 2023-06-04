@@ -63,7 +63,8 @@ def get_model_args(args, data):
             'dropout': 0.1, 'activation': "gelu", 'data_rep': data_rep, 'cond_mode': cond_mode,
             'cond_mask_prob': args.cond_mask_prob, 'action_emb': action_emb, 'arch': args.arch,
             'emb_trans_dec': args.emb_trans_dec, 'clip_version': clip_version, 'dataset': args.dataset,
-            'tokenizer': tokenizer}
+            'tokenizer': tokenizer, 'num_input_layers': args.num_input_layers, 'num_output_layers':
+                args.num_output_layers}
 
 
 def create_gaussian_diffusion(args):

@@ -48,7 +48,7 @@ class TrainLoop:
 
         self.step = 0
         self.resume_step = 0
-        self.global_batch = self.batch_size # * dist.get_world_size()
+        self.global_batch = self.batch_size  # * dist.get_world_size() # TODO- where is this used except for logging?
         self.num_steps = args.num_steps
         self.num_epochs = self.num_steps // len(self.data) + 1
 
