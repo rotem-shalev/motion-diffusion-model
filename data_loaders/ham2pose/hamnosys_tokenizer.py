@@ -26,11 +26,14 @@ class HamNoSysTokenizer:
             ham2token = {val: chr(key) for key, val in font["cmap"].getBestCmap().items()}
 
         if self.split_move_direction:
-            split_ham = {"circle": 'c', "move": 'm'}
+            split_ham = {"circle": '\ue092', "move": '\ue081', "symm": '\ue0e9', "extfinger": '\ue020'}
             tokens += list(split_ham.values())
             direction_tokens = {'o': 'o', 'i': 'i', 'd': 'd', 'u': 'u', 'l': 'l', 'r': 'r', 'ul': 'a', 'dr': 'b',
-                                'ur': 'n', 'dl': 'q', 'ol': 'e', 'ir': 'f', 'or': 'g', 'il': 'h', 'ui': 'p',
-                                'do': 'j', 'uo': 'k', 'di': 's', 'udl': 't', 'X': 'X', 'cross': 'x'}
+                                'ur': 'n', 'dl': 'q', 'ol': 'e', 'ir': 'f', 'or': 'g', 'il': 'h', 'ui': 'w',
+                                'do': 'j', 'uo': 'k', 'di': 's', 'udl': 't', 'X': 'X', 'cross': 'x', 'lr': 'z',
+                                'par': 'p'}
+            assert len(set(direction_tokens.values())) == len(direction_tokens.values())
+
             tokens += list(direction_tokens.values())
 
             self.split_tokens = {}
@@ -39,7 +42,6 @@ class HamNoSysTokenizer:
                     if ham in h:
                         tokens.remove(ham2token[h])
                         self.split_tokens[ham2token[h]] = split_ham[ham] + direction_tokens[h[len(f'ham{ham}'):]]
-                        # ham2token[h] = (token, h[len(f'ham{token}'):])
                         break
 
         self.i2s = {(i + self.num_special_tokens): c for i, c in enumerate(tokens)}

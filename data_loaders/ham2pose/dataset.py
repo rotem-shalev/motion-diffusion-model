@@ -28,7 +28,7 @@ class Ham2Pose(Dataset):
         self.max_len = max_len
         self.max_seq_num = max_seq_num  # allow limitation for testing
 
-        with open("dataset/ham2pose_processed_dataset_3.pkl", 'rb') as f:
+        with open(os.path.join(rootdir, "dataset/ham2pose_processed_dataset_3.pkl"), 'rb') as f:
             data = pkl.load(f)
         self.data = data[split]
 

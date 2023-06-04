@@ -26,8 +26,10 @@ from visualize.vis_2d import visualize_seq
 
 def main():
     args = generate_args()
-    # args.text_prompt = "\ue000\ue00c\ue0e6\ue000\ue00e\ue029\ue03d\ue084\ue0c6"
-                       #"\ue002\ue00c\ue020\ue03e\ue051\ue093\ue0c6\ue0d8" # pjm_2377 with palml
+    # args.text_prompt = "\ue0e9\ue002\ue031\ue03d\ue0d1\ue051\ue082\ue084\ue086\ue0d1" #9845- TODO check with split
+    #  move direction
+    # args.text_prompt = "\ue0e2\ue000\ue00d\ue020\ue03e\ue0e7\ue000\ue00d\ue022\ue03c\ue0e3\ue051\ue0e2\ue0aa\ue026" \
+    #                    "\ue03c\ue083\ue0c6\ue063\ue0e0\ue0d1\ue078\ue0e1\ue0e3\ue0d8" # pjm_1685
 
     fixseed(args.seed)
     out_path = args.output_dir
@@ -102,6 +104,7 @@ def main():
         if args.dataset == "all_hands":
             model_kwargs['y']['lengths'] = torch.ones_like(model_kwargs['y']['lengths'])*max_frames
     else:
+        n_frames = 70
         collate_args = [{'inp': torch.zeros(n_frames), 'tokens': None, 'lengths': n_frames}] * args.num_samples
         is_t2m = any([args.input_text, args.text_prompt])
         if is_t2m:
@@ -118,6 +121,11 @@ def main():
     all_lengths = []
     all_text = []
 
+    if 'mask' in model_kwargs['y']:
+        padding_mask = torch.zeros((args.batch_size, 1, 1, max_frames - model_kwargs['y']['mask'].shape[-1]),
+                                   dtype=torch.bool)
+        model_kwargs['y']['mask'] = torch.cat([model_kwargs['y']['mask'], padding_mask], dim=-1).to(dist_util.dev())
+
     for rep_i in range(args.num_repetitions):
         print(f'### Sampling [repetitions #{rep_i}]')
 
@@ -125,15 +133,11 @@ def main():
         if args.guidance_param != 1:
             model_kwargs['y']['scale'] = torch.ones(args.batch_size, device=dist_util.dev()) * args.guidance_param
 
-        if 'mask' in model_kwargs['y']:
-            padding_mask = torch.zeros((args.batch_size, 1, 1, max_frames-model_kwargs['y']['mask'].shape[-1]), dtype=torch.bool)
-            model_kwargs['y']['mask'] = torch.cat([model_kwargs['y']['mask'], padding_mask], dim=-1).to(dist_util.dev())
-
         sample_fn = diffusion.p_sample_loop
 
         sample = sample_fn(
             model,
-            (args.batch_size, model.njoints, model.nfeats, n_frames),
+            (args.batch_size, model.njoints, model.nfeats, max_frames),
             clip_denoised=False,
             model_kwargs=model_kwargs,
             skip_timesteps=0,  # 0 is the default value - i.e. don't skip any step
@@ -177,19 +181,19 @@ def main():
     all_text = all_text[:total_num_samples]
     all_lengths = np.concatenate(all_lengths, axis=0)[:total_num_samples]
 
-    if os.path.exists(out_path):
-        shutil.rmtree(out_path)
-    os.makedirs(out_path)
+    # if os.path.exists(out_path):
+    #     shutil.rmtree(out_path)
+    os.makedirs(out_path, exist_ok=True)
 
-    npy_path = os.path.join(out_path, 'results.npy')
-    print(f"saving results file to [{npy_path}]")
-    np.save(npy_path,
-            {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
-             'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
-    with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
-        fw.write('\n'.join(all_text))
-    with open(npy_path.replace('.npy', '_len.txt'), 'w') as fw:
-        fw.write('\n'.join([str(l) for l in all_lengths]))
+    # npy_path = os.path.join(out_path, 'results.npy')
+    # print(f"saving results file to [{npy_path}]")
+    # np.save(npy_path,
+    #         {'motion': all_motions, 'text': all_text, 'lengths': all_lengths,
+    #          'num_samples': args.num_samples, 'num_repetitions': args.num_repetitions})
+    # with open(npy_path.replace('.npy', '.txt'), 'w') as fw:
+    #     fw.write('\n'.join(all_text))
+    # with open(npy_path.replace('.npy', '_len.txt'), 'w') as fw:
+    #     fw.write('\n'.join([str(l) for l in all_lengths]))
 
     print(f"saving visualizations to [{out_path}]...")
     skeleton = paramUtil.kit_kinematic_chain if args.dataset == 'kit' else paramUtil.t2m_kinematic_chain
@@ -203,7 +207,7 @@ def main():
     sample_file_template, row_file_template, all_file_template = construct_template_variables(args.unconstrained)
 
     if args.dataset == "ham2pose":
-        pose_header_path = "/home/rotem_shalev/Ham2Pose/data/hamnosys/openpose.poseheader"
+        pose_header_path = "visualize/openpose.poseheader"
         with open(pose_header_path, "rb") as buffer:
             pose_header = PoseHeader.read(BufferReader(buffer.read()))
 
