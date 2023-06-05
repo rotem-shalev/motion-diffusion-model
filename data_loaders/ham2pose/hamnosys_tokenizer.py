@@ -33,15 +33,15 @@ class HamNoSysTokenizer:
             suffix_tokens.update({"start": '2', "startseveral": '3'})  # TODO- add hamrepeatreverse too?
 
         if self.split_move_direction:
-            split_ham.update({"circle": 'c', "move": 'm'})
-            # split_ham.update({"circle": '\ue092', "move": '\ue081', "symm": '\ue0e9',
-            #              "extfinger": '\ue020'})  # TODO- uncomment for symm_extfinger
+            # split_ham.update({"circle": 'c', "move": 'm'})
+            split_ham.update({"circle": '\ue092', "move": '\ue081', "symm": '\ue0e9',
+                          "extfinger": '\ue020'})  # TODO- uncomment for symm_extfinger
 
             suffix_tokens.update({'o': 'o', 'i': 'i', 'd': 'd', 'u': 'u', 'l': 'l', 'r': 'r', 'ul': 'a', 'dr': 'b',
-                                'ur': 'n', 'dl': 'q', 'ol': 'e', 'ir': 'f', 'or': 'g', 'il': 'h', 'ui': 'p',
+                                'ur': 'n', 'dl': 'q', 'ol': 'e', 'ir': 'f', 'or': 'g', 'il': 'h', 'ui': 'w',
                                 # TODO- 'ui': 'p' for move_direction, 'ui': 'w' for symm_extfinger
                                 'do': 'j', 'uo': 'k', 'di': 's', 'udl': 't', 'X': 'X', 'cross': 'x',
-                                # 'lr': 'z', 'par': 'p' # TODO- uncomment for symm_extfinger
+                                'lr': 'z', 'par': 'p' # TODO- uncomment for symm_extfinger
                                 })
 
             assert len(set(suffix_tokens.values())) == len(suffix_tokens.values())
