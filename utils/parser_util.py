@@ -120,7 +120,7 @@ def add_data_options(parser):
     group.add_argument("--use_how2sign", action='store_true',
                        help="Weather or not to use how2sign data. only applicable for ham2pose dataset.")
     group.add_argument("--split_repeat", action='store_true',
-                       help="Weather or not to convert 'hamrepeatfromstart' to clones of text before repeat. "
+                       help="Weather or not to split hamnosys of repeat from times. "
                             "only applicable for ham2pose dataset.")
     group.add_argument("--split_move_direction", action='store_true',
                        help="Weather or not to split hamnosys of move from direction. "
