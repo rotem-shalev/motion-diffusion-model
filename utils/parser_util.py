@@ -125,6 +125,9 @@ def add_data_options(parser):
     group.add_argument("--split_move_direction", action='store_true',
                        help="Weather or not to split hamnosys of move from direction. "
                             "only applicable for ham2pose dataset.")
+    group.add_argument("--exp_conf", action='store_true',
+                       help="Weather or not to apply sigmoid over the confidence. "
+                            "only applicable for ham2pose dataset.")
     group.add_argument("--confidence_power", default=1.0, type=float,
                        help="power to raise the confidence by. default is 1 (no change). "
                             "only applicable for ham2pose dataset.")

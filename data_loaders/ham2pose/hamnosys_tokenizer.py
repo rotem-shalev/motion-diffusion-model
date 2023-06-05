@@ -46,11 +46,11 @@ class HamNoSysTokenizer:
 
             assert len(set(suffix_tokens.values())) == len(suffix_tokens.values())
 
+        self.split_tokens = {}
         if split_ham:
             tokens += list(split_ham.values())
             tokens += list(suffix_tokens.values())
 
-            self.split_tokens = {}
             for h in ham2token:
                 for ham in split_ham:
                     if ham in h:

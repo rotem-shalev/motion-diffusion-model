@@ -39,7 +39,8 @@ def main():
 
     print("creating data loader...")
     data = get_dataset_loader(name=args.dataset, batch_size=args.batch_size, num_frames=args.num_frames,
-                              max_seq_num=args.max_seq_num, subset=args.subset, conf_power=args.confidence_power)
+                              max_seq_num=args.max_seq_num, subset=args.subset, conf_power=args.confidence_power,
+                              exp_conf=args.exp_conf)
 
     print("creating model and diffusion...")
     model, diffusion = create_model_and_diffusion(args, data)

@@ -293,7 +293,8 @@ def load_dataset(args, max_frames, n_frames, subset=None, split='test'):
                               hml_mode='text_only',
                               subset=subset,
                               max_seq_num=args.max_seq_num,
-                              conf_power=args.confidence_power)
+                              conf_power=args.confidence_power,
+                              exp_conf=args.exp_conf)
     data.fixed_length = n_frames
     return data
 

@@ -17,7 +17,7 @@ class Ham2Pose(Dataset):
 
     def __init__(self, split="train", num_frames=inf, min_len=1, max_len=200, max_seq_num=inf,
                  sampling="conseq", sampling_step=1, pose_rep="xyz", use_how2sign=False, augment_rate=0.0,
-                 conf_power=1.0):
+                 conf_power=1.0, exp_conf=False):
 
         super().__init__()
 
@@ -49,6 +49,7 @@ class Ham2Pose(Dataset):
         self.augment_rate = augment_rate
         self.pose_rep = pose_rep
         self.conf_power = conf_power
+        self.exp_conf = exp_conf
 
     def __getitem__(self, index):
         data_index = self._data_ind[index]
@@ -67,6 +68,8 @@ class Ham2Pose(Dataset):
         pose = torch.from_numpy(pose_data.data).squeeze(1)
         conf = torch.from_numpy(pose_data.confidence).squeeze(1)
         conf = conf**self.conf_power
+        if self.exp_conf:
+            conf = torch.exp(conf)-1
         pose = pose.permute(1, 2, 0).contiguous()
         conf = conf.permute(1, 0).contiguous()
         return pose, conf

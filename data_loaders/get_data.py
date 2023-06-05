@@ -53,7 +53,7 @@ def get_collate_fn(name, hml_mode='train'):
 
 
 def get_dataset(name, num_frames, split='train', hml_mode='train', max_seq_num=inf, subset="", use_how2sign=False,
-                conf_power=1.0):
+                conf_power=1.0, exp_conf=False):
     DATA = get_dataset_class(name)
     if name in ["humanml", "kit"]:
         dataset = DATA(split=split, num_frames=num_frames, mode=hml_mode)
@@ -61,16 +61,16 @@ def get_dataset(name, num_frames, split='train', hml_mode='train', max_seq_num=i
         dataset = DATA(split=split, num_frames=num_frames, max_seq_num=max_seq_num, subset=subset)
     elif name == "ham2pose":
         dataset = DATA(split=split, num_frames=num_frames, max_seq_num=max_seq_num, use_how2sign=use_how2sign,
-                       conf_power=conf_power)
+                       conf_power=conf_power, exp_conf=exp_conf)
     else:
         dataset = DATA(split=split, num_frames=num_frames, max_seq_num=max_seq_num)
     return dataset
 
 
 def get_dataset_loader(name, batch_size, num_frames, split='train', hml_mode='train', max_seq_num=inf, subset="",
-                       use_how2sign=False, conf_power=1.0):
+                       use_how2sign=False, conf_power=1.0, exp_conf=False):
     dataset = get_dataset(name, num_frames, split, hml_mode, max_seq_num=max_seq_num, subset=subset,
-                          use_how2sign=use_how2sign, conf_power=conf_power)
+                          use_how2sign=use_how2sign, conf_power=conf_power, exp_conf=exp_conf)
     collate = get_collate_fn(name, hml_mode)
 
     loader = DataLoader(
