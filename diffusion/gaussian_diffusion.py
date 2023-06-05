@@ -204,8 +204,7 @@ class GaussianDiffusion:
                 / (1.0 - self.alphas_cumprod)
         )
 
-        self.l2_loss = lambda a, b: (
-                                                a - b) ** 2  # th.nn.MSELoss(reduction='none')  # must be None for handling mask later on.
+        self.l2_loss = lambda a, b: (a - b) ** 2  # th.nn.MSELoss(reduction='none')  # must be None for handling mask later on.
 
     def masked_l2(self, a, b, mask):
         # assuming a.shape == b.shape == bs, J, Jdim, seqlen
@@ -1262,7 +1261,7 @@ class GaussianDiffusion:
                                              # jointstype='vertices',  # 3.4 iter/sec # USED ALSO IN MotionCLIP
                                              jointstype='smpl',  # 3.4 iter/sec
                                              vertstrans=False)
-        # TODO- try glob True, visualize after this line
+        # TODO- visualize after this line
         if model_kwargs is None:
             model_kwargs = {}
         if noise is None:

@@ -26,12 +26,16 @@ class HamNoSysTokenizer:
             ham2token = {val: chr(key) for key, val in font["cmap"].getBestCmap().items()}
 
         if self.split_move_direction:
-            split_ham = {"circle": '\ue092', "move": '\ue081', "symm": '\ue0e9', "extfinger": '\ue020'}
+            split_ham = {"circle": 'c', "move": 'm'}
+            # split_ham = {"circle": '\ue092', "move": '\ue081', "symm": '\ue0e9',
+            #              "extfinger": '\ue020'}  # TODO- uncomment for symm_extfinger
             tokens += list(split_ham.values())
             direction_tokens = {'o': 'o', 'i': 'i', 'd': 'd', 'u': 'u', 'l': 'l', 'r': 'r', 'ul': 'a', 'dr': 'b',
-                                'ur': 'n', 'dl': 'q', 'ol': 'e', 'ir': 'f', 'or': 'g', 'il': 'h', 'ui': 'w',
-                                'do': 'j', 'uo': 'k', 'di': 's', 'udl': 't', 'X': 'X', 'cross': 'x', 'lr': 'z',
-                                'par': 'p'}
+                                'ur': 'n', 'dl': 'q', 'ol': 'e', 'ir': 'f', 'or': 'g', 'il': 'h', 'ui': 'p',
+                                # TODO- 'ui': 'p' for move_direction, 'ui': 'w' for symm_extfinger
+                                'do': 'j', 'uo': 'k', 'di': 's', 'udl': 't', 'X': 'X', 'cross': 'x',
+                                # 'lr': 'z', 'par': 'p' # TODO- uncomment for symm_extfinger
+                                }
             assert len(set(direction_tokens.values())) == len(direction_tokens.values())
 
             tokens += list(direction_tokens.values())
