@@ -4,6 +4,7 @@ Train a diffusion model on images.
 """
 import sys
 import os
+import glob
 
 rootdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 sys.path.insert(0, rootdir)
@@ -28,7 +29,13 @@ def main():
     if args.save_dir is None:
         raise FileNotFoundError('save_dir was not specified.')
     elif os.path.exists(args.save_dir) and not args.overwrite:
-        raise FileExistsError('save_dir [{}] already exists.'.format(args.save_dir))
+        print("in")
+        models_path = os.path.join(args.save_dir, "model*.pt")
+        dirs = glob.glob(models_path)
+        if not dirs:
+            raise FileExistsError('save_dir [{}] already exists.'.format(args.save_dir))
+        args.resume_checkpoint = sorted(dirs)[-1]
+
     elif not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
     args_path = os.path.join(args.save_dir, 'args.json')
