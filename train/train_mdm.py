@@ -29,7 +29,6 @@ def main():
     if args.save_dir is None:
         raise FileNotFoundError('save_dir was not specified.')
     elif os.path.exists(args.save_dir) and not args.overwrite:
-        print("in")
         models_path = os.path.join(args.save_dir, "model*.pt")
         dirs = glob.glob(models_path)
         if not dirs:

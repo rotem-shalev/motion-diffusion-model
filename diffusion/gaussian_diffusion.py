@@ -1245,8 +1245,6 @@ class GaussianDiffusion:
         :return: a dict with the key "loss" containing a tensor of shape [N].
                  Some mean or variance settings may also have other keys.
         """
-
-        # enc = model.model._modules['module']
         enc = model.model
         mask = model_kwargs['y']['mask']
         if confidence is not None:
@@ -1363,7 +1361,24 @@ class GaussianDiffusion:
                                                   mask[..., 1:])  # mean_flat((target_vel - model_output_vel) ** 2)
 
             if self.lambda_touch > 0.:
-                pass
+                text_touch_mask = ["\ue0d1" in s for s in model_kwargs['y']["text"]]
+                hands_touch_mask = torch.linalg.norm(target[text_touch_mask][:, -42:-21] -
+                                    target[text_touch_mask][:, -21:], axis=2) < 0.001
+                hands_touch_mask = torch.unsqueeze(hands_touch_mask, 2).repeat(1, 1, 2, 1) \
+                                   & (target[text_touch_mask][:, -42:-21] != 0) \
+                                   & (target[text_touch_mask][:, -21:] != 0)
+                # torch.all(target[text_touch_mask][:, -42:-21] != 0, dim=2).size()
+                # torch.unique(target[text_touch_mask][:, -42:-21][torch.unsqueeze(torch.linalg.norm(target[text_touch_mask][:, -42:-21] -
+                #                                     target[text_touch_mask][:, -21:], axis=2), 2).repeat(1,1,2,1) < 0.001])
+                pred_hands_touch = torch.linalg.norm(model_output[text_touch_mask][:, -42:-21] -
+                                                     model_output[text_touch_mask][:, -21:], axis=2)
+                pred_hands_touch = torch.unsqueeze(pred_hands_touch, 2).repeat(1, 1, 2, 1)
+                pred_hands_touch[~hands_touch_mask] = 0
+                terms["touch"] = torch.zeros_like(terms["rot_mse"])
+                terms["touch"][text_touch_mask] = self.masked_l2(pred_hands_touch,
+                                                                 torch.zeros(pred_hands_touch.shape, device=pred_hands_touch.device),
+                                                                 torch.ones_like(pred_hands_touch))
+                # TODO- currently only forces hands touch where both hands keypoints exist + touch in sequence
 
             terms["loss"] = terms["rot_mse"] + terms.get('vb', 0.) + \
                             (self.lambda_vel * terms.get('vel_mse', 0.)) + \

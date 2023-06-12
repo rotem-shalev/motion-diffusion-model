@@ -264,7 +264,6 @@ if __name__ == "__main__":
     # get_meineDGS_data()
     # process_text("/mnt/raid1/home/rotem_shalev/motion-diffusion-model/data_loaders/ham2pose/meineDGS/srt")
     # add_hamnosys_text("/home/rotem_shalev/Ham2Pose/data/hamnosys/data.json")
-    txt = "\ue005\ue00e\ue020\ue03e\ue049\ue059\ue0e0\ue0d1\ue075\ue0e1\ue0e2\ue083\ue0aa\ue053\ue007\ue010\ue028\ue03c" \
-          "\ue0e3"
-    id = "pjm_1189"
+    txt = "\ue0e2\ue000\ue028\ue03e\ue0e7\ue000\ue02a\ue03a\ue0e3\ue0e2\ue069\ue0e7\ue06a\ue0e3\ue0d0\ue084\ue0d1"
+    id = "49029"
     get_k_most_similar(txt, k=5, id=id, method="text", split="test")

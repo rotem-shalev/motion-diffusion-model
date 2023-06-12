@@ -96,6 +96,7 @@ def add_model_options(parser):
     group.add_argument("--lambda_rcxyz", default=0.0, type=float, help="Joint positions loss.")
     group.add_argument("--lambda_vel", default=0.0, type=float, help="Joint velocity loss.")
     group.add_argument("--lambda_fc", default=0.0, type=float, help="Foot contact loss.")
+    group.add_argument("--lambda_touch", default=0.0, type=float, help="Touch loss.")
     group.add_argument("--loss_scale", default=1.0, type=float, help="loss scale.")
     group.add_argument("--step_weight", default=False, type=bool, help="use step weights in loss function. only "
                                                                        "relevant for 'ham2pose' dataset")
